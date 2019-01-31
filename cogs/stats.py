@@ -1,0 +1,122 @@
+import discord
+from discord.ext import commands
+import imp
+import time
+import datetime
+from io import BytesIO
+import asyncio
+import aiohttp
+import json
+from numpy import cos, sin, radians, ceil
+from PIL import Image, ImageOps, ImageDraw, ImageFilter, ImageEnhance, ImageFont
+
+status = {'online':(67, 181, 129),
+          'away':(250, 166, 26),
+          'dnd':(240, 71, 71),
+          'offline':(116, 127, 141)}
+discord_neutral = (188,188,188)
+
+class Stats:
+    def __init__(self, bot):
+        self.bot = bot
+        
+    @commands.command()
+    async def piestatus(self, ctx, target : discord.Member = None):
+        '''Generates a pie chart displaying the ratios between the statuses the bot has seen the user use.'''
+        target = target or ctx.author
+        async with ctx.channel.typing():
+            rows = await self.bot.pool.fetch('''
+                with status_data as(
+                    select
+                        uid,
+                        status,
+                        status_last,
+                        first_seen,
+                            case when 
+                                lag(first_seen) over (order by first_seen desc) is null then
+                                    now() at time zone 'utc'
+                                else
+                                    lag(first_seen) over (order by first_seen desc)
+                            end as last_seen
+                    from (
+                        select
+                            uid,
+                            status,
+                            lag(status) over (order by first_seen asc) as status_last,
+                            first_seen
+                        from statuses
+                        where uid=$1 or uid=0
+                    ) subtable
+                    where
+                        status != status_last or status_last is null
+                )
+
+                select
+                    status,
+                    sum(extract(epoch from(last_seen - first_seen))) as sum
+                from status_data
+                where last_seen > (now() at time zone 'utc' - interval '30 days')
+                group by status
+                order by sum desc
+            ''', target.id)
+            async with self.bot.session.get(target.avatar_url_as(format='png')) as r:
+                avydata = BytesIO(await r.read())
+            data = dict()
+            for row in rows:
+                if row['status'] == 'online':
+                    data['online'] = row['sum']
+                elif row['status'] == 'offline':
+                    data['offline'] = row['sum']
+                elif row['status'] == 'idle':
+                    data['away'] = row['sum']
+                elif row['status'] == 'dnd':
+                    data['dnd'] = row['sum']
+            file = await self.bot.loop.run_in_executor(None, self._piestatus, avydata, data)
+            await ctx.send(file=file)
+    def _piestatus(self, avydata, statuses):
+        total = sum(statuses.values())
+        stat_deg = {k:(v/total)*360 for k, v in statuses.items()}
+        angles = dict()
+        starting = -90
+        for k,v in stat_deg.items():
+            angles[k] = starting + v
+            starting += v
+        base = Image.new(mode='RGBA', size=(400, 300), color=(0, 0, 0, 0))
+        piebase = Image.new(mode='RGBA', size=(400, 300), color=(0, 0, 0, 0))
+        with Image.open(avydata).resize((200,200), resample=Image.BILINEAR).convert('RGBA') as avy:
+            with Image.open('piestatustest2.png').convert('L') as mask:
+                base.paste(avy, (50,50), avy)
+                draw = ImageDraw.Draw(piebase)
+                maskdraw = ImageDraw.Draw(mask)
+                starting = -90
+                for k, v in angles.items():
+                    if starting == v:
+                        continue
+                    else:
+                        draw.pieslice(((-5,-5),(305,305)),starting, v, fill=status[k])
+                        starting = v
+                if not 360 in stat_deg:
+                    for k, v in angles.items():
+                        x = 150 + ceil(15000 * cos(radians(v)))/100
+                        y = 150 + ceil(15000 * sin(radians(v)))/100
+                        draw.line(((150, 150), (x, y)), fill=(255,255,255,255), width=1)
+                del maskdraw
+                piebase.putalpha(mask)
+        font = ImageFont.truetype("arial.ttf", 15)
+        bx = 310
+        by = {'online':60, 'away':110, 'dnd':160, 'offline':210}
+        base.paste(piebase, None, piebase)
+        draw = ImageDraw.Draw(base)
+        print(total)
+        for k, v in statuses.items():
+            draw.rectangle(((bx, by[k]),(bx+30, by[k]+30)), fill=status[k], outline=(255,255,255,255))
+            draw.text((bx+40, by[k]+8), f'{(v/total)*100:.2f}%', fill=discord_neutral, font=font)
+            print(f'{(v/total)*100:.2f}%')
+        del draw
+        buffer = BytesIO()
+        base.save(buffer, 'png')
+        buffer.seek(0)
+        return discord.File(buffer, filename='pie_status.png')
+        
+def setup(bot):
+    bot.add_cog(Stats(bot))
