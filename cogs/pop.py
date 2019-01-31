@@ -29,21 +29,12 @@ class Pop:
     def __unload(self):
         print('die')
         utcnow = datetime.datetime.utcnow()
-        self.bg_task['names'].cancel()
-        self.pending_updates['names'].append((0, 'cog_offline', utcnow))
-        self.bg_task['avatars'].cancel()
-        self.pending_updates['avatars'].append((0, 'cog_offline', 'cog_offline', 'cog_offline', utcnow))
-        self.bg_task['discrims'].cancel()
-        self.pending_updates['discrims'].append((0, 'cog_offline', utcnow))
-        self.bg_task['nicks'].cancel()
-        self.pending_updates['nicks'].append((0, 0, 'cog_offline', utcnow))
-        self.bg_task['statuses'].cancel()
-        self.pending_updates['statuses'].append((0, 'cog_offline', utcnow))
-        self.bg_task['games'].cancel()
-        self.pending_updates['games'].append((0, 'cog_offline', utcnow))
+        for recordtype in scheme.keys():
+            self.bg_task[recordtype].cancel() 
+        self.fill_updates(0, 0, 'cog_offline', utcnow, True)
 
 
-    async def batching_task(self, recordtype, interval : int = 5): #modify this to work with others
+    async def batching_task(self, recordtype, interval : int = 5):
         print(f'started {recordtype} task')
         try:
             interval = min(max(1,interval),60)
@@ -74,6 +65,14 @@ class Pop:
         await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
         
         for m in list(set(self.bot.get_all_members())):
+            self.add_user(m, utcnow)
+        await asyncio.gather(*[self.insert_to_db(recordtype) for recordtype in scheme.keys()])
+        self.synced.set()
+        print("synced!")
+
+    def add_user(self, m, utcnow, full = True):
+        self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
+        if full:
             self.pending_updates['names'].append((m.id, m.name, utcnow))
             self.pending_updates['avatars'].append((
                                                     m.id,
@@ -83,13 +82,31 @@ class Pop:
                                                     utcnow
                                                   ))
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
-            self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
             self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
             self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-        await asyncio.gather(*[self.insert_to_db(recordtype) for recordtype in scheme.keys()])
-        self.synced.set()
-        print("synced!")
 
+    def fill_updates(self, uid, sid, msg, utcnow, full = True):
+        print(f'running fill_updates with {full}')
+        self.pending_updates['nicks'].append((uid, sid, msg, utcnow))
+        if full:
+            self.pending_updates['names'].append((uid, msg, utcnow))
+            self.pending_updates['avatars'].append((uid, msg, msg, msg, utcnow))
+            self.pending_updates['discrims'].append((uid, msg, utcnow))
+            self.pending_updates['statuses'].append((uid, msg, utcnow))
+            self.pending_updates['games'].append((uid, msg, utcnow))
+
+
+    async def on_member_join(self, member):
+        await self.synced.wait()
+        utcnow = datetime.datetime.utcnow()
+        do_full = sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 1
+        self.add_user(member, utcnow, do_full)
+
+    async def on_member_remove(self, member):
+        await self.synced.wait()
+        utcnow = datetime.datetime.utcnow()
+        do_full = sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 0
+        self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, do_full) #untested stuff
 
     async def on_member_update(self, before, after):
         await self.synced.wait()
@@ -119,8 +136,34 @@ class Pop:
             if before.activity != after.activity and not after.bot:
                 self.pending_updates['games'].append((aid, after.activity.name if after.activity else None, utcnow))
 
+    async def on_guild_join(self, guild):
+        """
+            It is rare to have too many dups of members in new guilds.
+            Regardless, dups don't matter and are easy to deal with.
+        """
+        await self.synced.wait()
+        utcnow = datetime.datetime.utcnow()
+        for member in guild.members:
+            self.add_user(member, utcnow)
+        print(f'Added {guild.member_count} people to queues!')
+
+    async def on_guild_remove(self, guild):
+        """
+            Figuring out which users the bot can still see is important.
+        """
+        await self.synced.wait()
+        utcnow = datetime.datetime.utcnow()
+        for member in guild.members:
+            if sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 0:
+                self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, True)
+            else:
+                self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, False)
+
+
+
     @commands.command()
     async def stahp(self, ctx):
+
         self.__unload()
                 
 
