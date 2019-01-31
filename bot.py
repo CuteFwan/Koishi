@@ -11,7 +11,7 @@ import traceback
 import sys
 
 
-#oof
+#unnecessary stuff copy pasted in mostly
 with open('config.json', 'r') as f:
     config = json.load(f)
 BOT_INVITE = config["BOT_INVITE"]
