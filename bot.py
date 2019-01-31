@@ -1,4 +1,4 @@
-from discord.ext import commands as コマンド
+from discord.ext import commands
 import discord
 import datetime
 import logging
@@ -28,41 +28,41 @@ logger.addHandler(handler)
 
 
 description = '''Lies and slander follow'''
-ボット = コマンド.AutoShardedBot(command_prefix=コマンド.when_mentioned_or('!'), description=description)
+bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or('!'), description=description)
 
 @bot.check
-async def globally_block_dms(ctx):
+async def make_sure_nobody_else_uses_this_bot(ctx):
     if ctx.author.id in [109778500260528128, 145802776247533569]:
         return True
     return False
 
-@ボット.event
+@bot.event
 async def on_ready():
-    print('Logged in as', ボット.user)
-    print('id', ボット.user.id)
+    print('Logged in as', bot.user)
+    print('id', bot.user.id)
     print('Running', discord.__version__)
 
-@ボット.command(hidden=True)
+@bot.command(hidden=True)
 async def dreload(ctx, extension_name: str):
-    ボット.unload_extension(extension_name)
+    bot.unload_extension(extension_name)
     try:
-        ボット.load_extension(extension_name)
+        bot.load_extension(extension_name)
     except (AttributeError, ImportError) as e:
         await ctx.send("```py\n{}: {}\n```".format(type(e).__name__, str(e)))
         return
     print("{} reloaded.".format(extension_name))
     await ctx.send("{} reloaded.".format(extension_name))
 
-@ボット.command(hidden=True)
+@bot.command(hidden=True)
 async def logout(ctx):
     await ctx.send('goodbye')
-    await ボット.logout()
+    await bot.logout()
 
-@ボット.event
+@bot.event
 async def on_message(message):
-    if message.author.bot or (isinstance(message.channel, discord.TextChannel) and  ボット.get_cog('Alias') is not None):
+    if message.author.bot or (isinstance(message.channel, discord.TextChannel) and  bot.get_cog('Alias') is not None):
         return
-    await ボット.process_commands(message)
+    await bot.process_commands(message)
 
 async def finishdb(pool):
     print('Finalizing db...')
@@ -85,26 +85,26 @@ def run():
         print('Could not set up postgresql')
         traceback.print_exc()
         return
-    ボット.session = aiohttp.ClientSession()
-    ボット.pool = pool
-    ボット.bot_invite = BOT_INVITE
-    ボット.server_invite = SERVER_INVITE
-    ボット.finishdb = finishdb
-    ボット.start_time = datetime.datetime.utcnow()
+    bot.session = aiohttp.ClientSession()
+    bot.pool = pool
+    bot.bot_invite = BOT_INVITE
+    bot.server_invite = SERVER_INVITE
+    bot.finishdb = finishdb
+    bot.start_time = datetime.datetime.utcnow()
     try:
-        loop.run_until_complete(startdb(ボット.pool))
-        loop.run_until_complete(ボット.start(TOKEN))
+        loop.run_until_complete(startdb(bot.pool))
+        loop.run_until_complete(bot.start(TOKEN))
     except KeyboardInterrupt:
-        loop.run_until_complete(ボット.logout())
+        loop.run_until_complete(bot.logout())
     finally:
-        loop.run_until_complete(ボット.finishdb(ボット.pool))
+        loop.run_until_complete(bot.finishdb(bot.pool))
         loop.close()
         
     
 if __name__ == "__main__":
     for extension in STARTUP_EXTENSIONS:
         try:
-            ボット.load_extension(extension)
+            bot.load_extension(extension)
         except Exception as e:
             print(f'Failed to load extension {extension}.', file=sys.stderr)
             traceback.print_exc()
