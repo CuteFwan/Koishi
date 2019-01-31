@@ -27,8 +27,14 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 
-description = '''Empty'''
+description = '''Lies and slander follow'''
 ボット = コマンド.AutoShardedBot(command_prefix=コマンド.when_mentioned_or('!'), description=description)
+
+@bot.check
+async def globally_block_dms(ctx):
+    if ctx.author.id in [109778500260528128, 145802776247533569]:
+        return True
+    return False
 
 @ボット.event
 async def on_ready():
