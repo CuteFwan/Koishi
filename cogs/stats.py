@@ -28,28 +28,30 @@ class Stats:
             rows = await self.bot.pool.fetch('''
                 with status_data as(
                     select
-                        first_seen,
                         status,
-                        status_last,
+                        first_seen_chopped as first_seen,
                         case when 
-                            lag(first_seen) over (order by first_seen desc) is null then
+                            lag(first_seen_chopped) over (order by first_seen desc) is null then
                                 now() at time zone 'utc'
                             else
-                                lag(first_seen) over (order by first_seen desc)
+                                lag(first_seen_chopped) over (order by first_seen desc)
                         end as last_seen
                     from (
                         select
-                            status,
-                            lag(status) over (order by first_seen desc) as status_last,
+                            distinct on (first_seen_chopped)
+                            first_seen,
                             case when first_seen < (now() at time zone 'utc' - interval '30 days') then
                                 (now() at time zone 'utc' - interval '30 days')
-                                else first_seen end
-                        from statuses
+                                else first_seen end as first_seen_chopped,
+                            status,
+                            lag(status) over (order by first_seen desc) as status_last
+                        from koi.statuses
                         where uid=$1 or uid=0
-                        order by first_seen desc
+                        order by first_seen_chopped desc, first_seen desc
                     ) subtable
-                    where status is distinct from status_last
-                    order by last_seen desc
+                    where
+                        status is distinct from status_last
+                    order by first_seen desc
                 )
                 select
                     status,
@@ -59,8 +61,6 @@ class Stats:
                         last_seen - first_seen
                     ))) as sum
                 from status_data
-                where
-                last_seen is distinct from first_seen
                 group by status
                 order by sum desc
             ''', target.id)
