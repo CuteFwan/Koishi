@@ -45,7 +45,7 @@ class Stats:
                                 else first_seen end as first_seen_chopped,
                             status,
                             lag(status) over (order by first_seen desc) as status_last
-                        from koi.statuses
+                        from statuses
                         where uid=$1 or uid=0
                         order by first_seen_chopped desc, first_seen desc
                     ) subtable
