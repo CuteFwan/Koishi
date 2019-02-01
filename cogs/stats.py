@@ -28,34 +28,39 @@ class Stats:
             rows = await self.bot.pool.fetch('''
                 with status_data as(
                     select
-                        uid,
+                        first_seen,
                         status,
                         status_last,
-                        first_seen,
-                            case when 
-                                lag(first_seen) over (order by first_seen desc) is null then
-                                    now() at time zone 'utc'
-                                else
-                                    lag(first_seen) over (order by first_seen desc)
-                            end as last_seen
+                        case when 
+                            lag(first_seen) over (order by first_seen desc) is null then
+                                now() at time zone 'utc'
+                            else
+                                lag(first_seen) over (order by first_seen desc)
+                        end as last_seen
                     from (
                         select
-                            uid,
                             status,
-                            lag(status) over (order by first_seen asc) as status_last,
-                            first_seen
+                            lag(status) over (order by first_seen desc) as status_last,
+                            case when first_seen < (now() at time zone 'utc' - interval '30 days') then
+                                (now() at time zone 'utc' - interval '30 days')
+                                else first_seen end
                         from statuses
                         where uid=$1 or uid=0
+                        order by first_seen desc
                     ) subtable
-                    where
-                        status != status_last or status_last is null
+                    where status is distinct from status_last
+                    order by last_seen desc
                 )
-
                 select
                     status,
-                    sum(extract(epoch from(last_seen - first_seen))) as sum
+                    sum(
+                    extract(
+                    epoch from(
+                        last_seen - first_seen
+                    ))) as sum
                 from status_data
-                where last_seen > (now() at time zone 'utc' - interval '30 days')
+                where
+                last_seen is distinct from first_seen
                 group by status
                 order by sum desc
             ''', target.id)

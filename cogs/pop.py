@@ -150,6 +150,7 @@ class Pop:
     async def on_guild_remove(self, guild):
         """
             Figuring out which users the bot can still see is important.
+            Need to find a better way to figure out if the user is in any other mutual guilds.
         """
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
@@ -160,11 +161,6 @@ class Pop:
                 self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, False)
 
 
-
-    @commands.command()
-    async def stahp(self, ctx):
-
-        self.__unload()
                 
 
     
