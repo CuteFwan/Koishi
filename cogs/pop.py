@@ -9,12 +9,39 @@ import asyncio
 
 
 scheme = {
-         'names' : ['uid','name','first_seen'],
-         'avatars' : ['uid','avatar','avatar_url','path','first_seen'],
-         'discrims' : ['uid','discrim','first_seen'],
-         'nicks' : ['uid','sid','nick','first_seen'],
-         'statuses' : ['uid','status','first_seen'],
-         'games' : ['uid','game','first_seen']
+         'names' : {
+            'uid' : 'BIGINT',
+            'name' : 'TEXT',
+            'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
+            },
+         'avatars' : {
+            'uid' : 'BIGINT',
+            'avatar' : 'TEXT',
+            'avatar_url' : 'TEXT',
+            'path' : 'TEXT',
+            'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
+            },
+         'discrims' : {
+            'uid' : 'BIGINT',
+            'discrim' : 'TEXT',
+            'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
+            },
+         'nicks' : {
+            'uid' : 'BIGINT',
+            'sid' : 'BIGINT',
+            'nick' : 'TEXT',
+            'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
+            },
+         'statuses' : {
+            'uid' : 'BIGINT',
+            'status' : 'TEXT',
+            'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
+            },
+         'games' : {
+            'uid' : 'BIGINT',
+            'game' : 'TEXT',
+            'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
+            }
          }
 
 
@@ -23,14 +50,14 @@ class Pop:
         self.bot = bot
         self.pending_updates = {recordtype : [] for recordtype in scheme.keys()}
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
-        #self.bg_tasks = [{'statuses' : self.bot.loop.create_task(self.batching_task('statuses'))}]
         self.synced = asyncio.Event()
         
     def __unload(self):
         print('die')
         utcnow = datetime.datetime.utcnow()
         for recordtype in scheme.keys():
-            self.bg_task[recordtype].cancel() 
+            print(f'canceling {recordtype}')
+            self.bg_tasks[recordtype].cancel()
         self.fill_updates(0, 0, 'cog_offline', utcnow, True)
 
 
@@ -57,7 +84,24 @@ class Pop:
         self.pending_updates[recordtype] = []
         print(f'trying to insert {len(to_insert)} to {recordtype}')
         async with self.bot.pool.acquire() as con:
-            result = await con.copy_records_to_table(recordtype, records=to_insert, columns=scheme[recordtype],schema_name='koi_test')
+            result = await con.copy_records_to_table(recordtype, records=to_insert, columns=scheme[recordtype].keys(),schema_name='koi_test')
+
+    async def insert_to_db_2(self, recordtype):
+        to_insert = self.pending_updates[recordtype]
+        if len(to_insert) == 0:
+            return
+        self.pending_updates[recordtype] = []
+        print(f'trying to insert {len(to_insert)} to {recordtype}')
+        names = scheme[recordtype].keys()
+        cols = ', '.join(names)
+        types = ', '.join(f'{k} {v}' for k, v in scheme[recordtype].items())
+        transformed = [{col : row[i] for i, col in enumerate(names)} for row in to_insert]
+        query = f'''
+                insert into {recordtype} ({cols})
+                select {cols}
+                from jsonb_to_recordset($1::jsonb) as x({types})
+                '''
+        await self.bot.pool.execute(query, transformed)
 
     async def on_ready(self):
         utcnow = datetime.datetime.utcnow()

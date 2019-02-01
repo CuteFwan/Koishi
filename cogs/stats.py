@@ -76,8 +76,8 @@ class Stats:
                     data['away'] = row['sum']
                 elif row['status'] == 'dnd':
                     data['dnd'] = row['sum']
-            file = await self.bot.loop.run_in_executor(None, self._piestatus, avydata, data)
-            await ctx.send(file=file)
+            data = await self.bot.loop.run_in_executor(None, self._piestatus, avydata, data)
+            await ctx.send(file=discord.File(data, filename=f'{target.display_name}_pie_status.png'))
     def _piestatus(self, avydata, statuses):
         total = sum(statuses.values())
         stat_deg = {k:(v/total)*360 for k, v in statuses.items()}
@@ -121,7 +121,7 @@ class Stats:
         buffer = BytesIO()
         base.save(buffer, 'png')
         buffer.seek(0)
-        return discord.File(buffer, filename='pie_status.png')
+        return buffer
         
 def setup(bot):
     bot.add_cog(Stats(bot))

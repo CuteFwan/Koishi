@@ -60,26 +60,36 @@ async def logout(ctx):
 
 @bot.event
 async def on_message(message):
-    if message.author.bot or (isinstance(message.channel, discord.TextChannel) and  bot.get_cog('Alias') is not None):
+    if message.author.bot:
         return
     await bot.process_commands(message)
 
-async def finishdb(pool):
-    print('Finalizing db...')
-    async with pool.acquire() as con:
-        pass
-    print('Finalized db')
-    
-async def startdb(pool):
-    print('Starting db...')
-    async with pool.acquire() as con:
-        pass
-    print('Told db bot started')
+async def create_pool(uri, **kwargs):
+    """
+        Experimenting with setting up pool with init.
+    """
+    def converter(data):
+        if isinstance(data, datetime.datetime):
+            return data.__str__()
+
+
+    def _encode_jsonb(data):
+        return json.dumps(data, default=converter)
+    def _decode_jsonb(data):
+        return json.loads(data)
+
+    extra_init = kwargs.pop('init', None)
+
+    async def init(conn):
+        await conn.set_type_codec('jsonb', schema='pg_catalog', encoder=_encode_jsonb, decoder=_decode_jsonb, format='text')
+        if extra_init is not None:
+            await extra_init(conn)
+    return await asyncpg.create_pool(uri, init=init, **kwargs)
     
 def run():
     loop = asyncio.get_event_loop()
     try:
-        pool = loop.run_until_complete(asyncpg.create_pool(DB_URI))
+        pool = loop.run_until_complete(create_pool(DB_URI))
         print('Connected to postgresql server')
     except Exception as e:
         print('Could not set up postgresql')
@@ -89,15 +99,12 @@ def run():
     bot.pool = pool
     bot.bot_invite = BOT_INVITE
     bot.server_invite = SERVER_INVITE
-    bot.finishdb = finishdb
     bot.start_time = datetime.datetime.utcnow()
     try:
-        loop.run_until_complete(startdb(bot.pool))
         loop.run_until_complete(bot.start(TOKEN))
     except KeyboardInterrupt:
         loop.run_until_complete(bot.logout())
     finally:
-        loop.run_until_complete(bot.finishdb(bot.pool))
         loop.close()
         
     
