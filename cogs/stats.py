@@ -25,7 +25,7 @@ class Stats:
         target = target or ctx.author
         if target.id == self.bot.user.id:
             return await ctx.send("I cannot see myself...")
-        msg = 'Not enough information.'
+        msg = f'{target.display_name} has been **{target.status.name}** for as long as I can tell...'
         status_info = offline_info = None
         status_info = await self.bot.pool.fetchval('''
             with lagged as(
@@ -80,20 +80,21 @@ class Stats:
             else:
                 msg += '{}m'.format(m)
                 
-            if offline_info and target.status.name != 'offline':
-                msg += '\nLast **offline** '
-                d, s = divmod(int(offline_info.total_seconds()), 86400)
-                h, s = divmod(s, 3600)
-                m, s = divmod(s, 60)
-                if d != 0:
-                    msg += '{}d {}h {}m'.format(d, h, m)
-                elif h != 0:
-                    msg += '{}h {}m'.format(h, m)
+            if target.status.name != 'offline':
+                if offline_info:
+                    msg += '\nLast **offline** '
+                    d, s = divmod(int(offline_info.total_seconds()), 86400)
+                    h, s = divmod(s, 3600)
+                    m, s = divmod(s, 60)
+                    if d != 0:
+                        msg += '{}d {}h {}m'.format(d, h, m)
+                    elif h != 0:
+                        msg += '{}h {}m'.format(h, m)
+                    else:
+                        msg += '{}m'.format(m)
+                    msg += ' ago.'
                 else:
-                    msg += '{}m'.format(m)
-                msg += ' ago.'
-            else:
-                msg += '\nHas not been seen offline in the last 30 days.'
+                    msg += '\nHas not been seen offline in the last 30 days.'
             
         await ctx.send(msg)
 
