@@ -80,7 +80,7 @@ class Stats:
             else:
                 msg += '{}m'.format(m)
                 
-            if offline_info:
+            if offline_info and target.status.name != 'offline':
                 msg += '\nLast **offline** '
                 d, s = divmod(int(offline_info.total_seconds()), 86400)
                 h, s = divmod(s, 3600)
