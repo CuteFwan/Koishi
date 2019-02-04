@@ -21,6 +21,81 @@ class Stats:
         self.bot = bot
         
     @commands.command()
+    async def myuptime(self, ctx, target : discord.Member = None):
+        target = target or ctx.author
+        msg = 'Not enough information.'
+        status_info = offline_info = None
+        status_info = await self.bot.pool.fetchval('''
+            with lagged as(
+                select
+                    status,
+                    lag(status) over (order by first_seen asc) as status_lag,
+                    first_seen,
+                    now() at time zone 'utc' - first_seen as since
+                from statuses
+                where (uid=$1 or uid=0) and
+                    first_seen > now() at time zone 'utc' - interval '30 days'
+            )
+            select distinct on (status)
+                since
+            from lagged
+            where 
+                status != status_lag and
+                status = $2
+            order by status, first_seen desc
+        ''', target.id, target.status.name)
+        
+        if target.status.name != 'offline':
+            offline_info = await self.bot.pool.fetchval('''
+                with lagged as(
+                    select
+                        status,
+                        lag(status) over (order by first_seen asc) as status_lag,
+                        first_seen,
+                        now() at time zone 'utc' - first_seen as since
+                    from statuses
+                    where (uid=$1 or uid=0) and
+                        first_seen > now() at time zone 'utc' - interval '30 days'
+                )
+                select
+                    since
+                from lagged
+                where
+                    status != 'offline' and status_lag = 'offline'
+                order by since asc
+                limit 1
+            ''', target.id)
+             
+        if status_info:   
+            msg = f'{target.display_name} has been **{target.status.name}** for '
+            d, s = divmod(int(status_info.total_seconds()), 86400)
+            h, s = divmod(s, 3600)
+            m, s = divmod(s, 60)
+            if d != 0:
+                msg += '{}d {}h {}m'.format(d, h, m)
+            elif h != 0:
+                msg += '{}h {}m'.format(h, m)
+            else:
+                msg += '{}m'.format(m)
+                
+            if offline_info:
+                msg += '\nLast **offline** '
+                d, s = divmod(int(offline_info.total_seconds()), 86400)
+                h, s = divmod(s, 3600)
+                m, s = divmod(s, 60)
+                if d != 0:
+                    msg += '{}d {}h {}m'.format(d, h, m)
+                elif h != 0:
+                    msg += '{}h {}m'.format(h, m)
+                else:
+                    msg += '{}m'.format(m)
+                msg += ' ago.'
+            else:
+                msg += '\nHas not been seen offline in the last 30 days.'
+            
+        await ctx.send(msg)
+
+    @commands.command()
     async def piestatus(self, ctx, target : discord.Member = None):
         '''Generates a pie chart displaying the ratios between the statuses the bot has seen the user use.'''
         target = target or ctx.author
