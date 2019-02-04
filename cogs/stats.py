@@ -94,7 +94,7 @@ class Stats:
                         msg += '{}m'.format(m)
                     msg += ' ago.'
                 else:
-                    msg += '\nHas not been seen offline in the last 30 days.'
+                    msg += '\nHas not been seen offline in the last 30 days as far as I can tell...'
             
         await ctx.send(msg)
 
