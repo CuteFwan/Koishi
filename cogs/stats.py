@@ -23,6 +23,8 @@ class Stats:
     @commands.command()
     async def myuptime(self, ctx, target : discord.Member = None):
         target = target or ctx.author
+        if target.id == self.bot.user.id:
+            return await ctx.send("I cannot see myself...")
         msg = 'Not enough information.'
         status_info = offline_info = None
         status_info = await self.bot.pool.fetchval('''
