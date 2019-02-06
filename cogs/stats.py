@@ -200,6 +200,114 @@ class Stats:
         base.save(buffer, 'png')
         buffer.seek(0)
         return buffer
+
+
+    @commands.command()
+    async def barstatus(self, ctx, target : discord.Member = None):
+        '''Generates a bar graph of each status the bot has seen the user use.'''
+        target = target or ctx.author
+        async with ctx.channel.typing():
+            rows = await self.bot.pool.fetch('''
+                with status_data as(
+                    select
+                        status,
+                        first_seen_chopped as first_seen,
+                        case when 
+                            lag(first_seen_chopped) over (order by first_seen desc) is null then
+                                now() at time zone 'utc'
+                            else
+                                lag(first_seen_chopped) over (order by first_seen desc)
+                        end as last_seen
+                    from (
+                        select
+                            distinct on (first_seen_chopped)
+                            first_seen,
+                            case when first_seen < (now() at time zone 'utc' - interval '30 days') then
+                                (now() at time zone 'utc' - interval '30 days')
+                                else first_seen end as first_seen_chopped,
+                            status,
+                            lag(status) over (order by first_seen desc) as status_last
+                        from statuses
+                        where uid=$1 or uid=0
+                        order by first_seen_chopped desc, first_seen desc
+                    ) subtable
+                    where
+                        status is distinct from status_last
+                    order by first_seen desc
+                )
+                select
+                    status,
+                    sum(
+                    extract(
+                    epoch from(
+                        last_seen - first_seen
+                    ))) as sum
+                from status_data
+                group by status
+                order by sum desc
+            ''', target.id)
+            data = dict()
+            for row in rows:
+                if row['status'] == 'online':
+                    data['online'] = row['sum']
+                elif row['status'] == 'offline':
+                    data['offline'] = row['sum']
+                elif row['status'] == 'idle':
+                    data['away'] = row['sum']
+                elif row['status'] == 'dnd':
+                    data['dnd'] = row['sum']
+            data = await self.bot.loop.run_in_executor(None, self._barstatus, f'{target}\'s uptime in the past 30 days', data)
+            await ctx.send(file=discord.File(data, filename=f'{target.display_name}_bar_status.png'))
+    def _barstatus(self, title, statuses):
+        highest = max(statuses.values())
+        highest_unit = self.get_significant(highest)
+        units = {stat:self.get_significant(value) for stat, value in statuses.items()}
+        heights = {stat:(value/highest)*250 for stat, value in statuses.items()}
+        box_size = (400,300)
+        rect_x_start = {k:64 + (84 * v) for k, v in {'online':0,'away':1,'dnd':2,'offline':3}.items()}
+        rect_width = 70
+        rect_y_end = 275
+        labels = {'online':'Online', 'away':'Away', 'dnd':'DnD', 'offline':'Offline'}
+        base = Image.new(mode='RGBA', size=box_size, color=(0, 0, 0, 0))
+        with Image.open('barstatus_grid1.png') as grid:
+            font = ImageFont.truetype("arial.ttf", 12)
+            draw = ImageDraw.Draw(base)
+            draw.text((5, 5), highest_unit[1], fill=discord_neutral, font=font)
+            draw.text((52,2),title, fill=discord_neutral,font=font)
+            divs = 11
+            for i in range(divs):
+                draw.line(((50,25+((box_size[1]-50)/(divs-1))*i),(box_size[0],25+((box_size[1]-50)/(divs-1))*i)),fill=(*discord_neutral,128), width=1)
+                draw.text((5, 25+((box_size[1]-50)/(divs-1))*i-6), f'{highest_unit[0]-i*highest_unit[0]/(divs-1):.2f}', fill=discord_neutral, font=font)
+            for k, v in statuses.items():
+                draw.rectangle(((rect_x_start[k], rect_y_end - heights[k]),(rect_x_start[k]+rect_width, rect_y_end)), fill=status[k])
+                draw.text((rect_x_start[k], rect_y_end - heights[k] - 13), f'{units[k][0]} {units[k][1]}', fill=discord_neutral, font=font)
+                draw.text((rect_x_start[k], box_size[1] - 25), labels[k], fill=discord_neutral, font=font)
+            del draw
+            base.paste(grid, None, grid)
+        buffer = BytesIO()
+        base.save(buffer, 'png')
+        buffer.seek(0)
+        return buffer
+    def get_significant(self, stat):
+        word = ''
+        if stat >= 604800:
+            stat /= 604800
+            word = 'Week' 
+        elif stat >= 86400:
+            stat /= 86400
+            word = 'Day' 
+        elif stat >= 3600:
+            stat /= 3600
+            word = 'Hour' 
+        elif stat >= 60:
+            stat /= 60
+            word = 'Minute' 
+        else:
+            word = 'Second'
+        stat = float(f'{stat:.1f}')
+        if stat > 1 or stat == 0.0:
+            word += 's'
+        return stat, word
         
 def setup(bot):
     bot.add_cog(Stats(bot))
