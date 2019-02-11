@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 import time
 import datetime
+from .utils import pretty
 
 class Basic:
     def __init__(self, bot):
@@ -24,18 +25,8 @@ class Basic:
     @commands.command()
     async def uptime(self, ctx):
         current_time = datetime.datetime.utcnow()
-        diff = current_time - self.bot.start_time
-        d, s = divmod(diff.seconds + diff.days * 86400, 86400)
-        h, s = divmod(s, 3600)
-        m, s = divmod(s, 60)
-        msg = ''
-        if d != 0:
-            msg += '{}d {}h {}m'.format(d, h, m)
-        elif h != 0:
-            msg += '{}h {}m'.format(h, m)
-        else:
-            msg += '{}m'.format(m)
-        print(f'{datetime.datetime.now()} - {msg} {s}s')
+        msg = pretty.delta_to_str(self.bot.start_time, current_time)
+        
         await ctx.send(f'for {msg} so far')
 
     
