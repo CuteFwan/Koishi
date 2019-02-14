@@ -7,6 +7,7 @@ from io import BytesIO
 import asyncio
 import aiohttp
 import json
+import typing
 from numpy import cos, sin, radians, ceil
 from PIL import Image, ImageOps, ImageDraw, ImageFilter, ImageEnhance, ImageFont
 
@@ -123,8 +124,17 @@ class Stats:
                                 else first_seen end as first_seen_chopped,
                             status,
                             lag(status) over (order by first_seen desc) as status_last
-                        from statuses
-                        where uid=$1 or uid=0
+                        from  ( 
+                            select status, first_seen
+                            from koi.statuses
+                            where uid=0
+                            union all
+                            select status, first_seen
+                            from statuses
+                            where uid=$1
+                            order by first_seen desc
+                            limit 2000
+                        ) first2000
                         order by first_seen_chopped desc, first_seen desc
                     ) subtable
                     where
@@ -227,8 +237,17 @@ class Stats:
                                 else first_seen end as first_seen_chopped,
                             status,
                             lag(status) over (order by first_seen desc) as status_last
-                        from statuses
-                        where uid=$1 or uid=0
+                        from  ( 
+                            select status, first_seen
+                            from koi.statuses
+                            where uid=0
+                            union all
+                            select status, first_seen
+                            from statuses
+                            where uid=$1
+                            order by first_seen desc
+                            limit 2000
+                        ) first2000
                         order by first_seen_chopped desc, first_seen desc
                     ) subtable
                     where
@@ -308,6 +327,12 @@ class Stats:
         if stat > 1 or stat == 0.0:
             word += 's'
         return stat, word
+
+    @commands.command()
+    async def histostatus(self, ctx, target : typing.Optional[discord.Member] = None , tz : int = 0):
+        if tz > 12 or tz < -12:
+            tz = 0
+        target = target or ctx.author
         
 def setup(bot):
     bot.add_cog(Stats(bot))
