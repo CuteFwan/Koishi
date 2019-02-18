@@ -347,7 +347,7 @@ class Stats:
                         union all
                         select status, first_seen
                         from statuses
-                        where uid=230365801457123328
+                        where uid=$1
                         order by first_seen desc
                         limit 2000
                     ) first2000
