@@ -161,7 +161,7 @@ class Stats:
             starting += v
         base = Image.new(mode='RGBA', size=(400, 300), color=(0, 0, 0, 0))
         piebase = Image.new(mode='RGBA', size=(400, 300), color=(0, 0, 0, 0))
-        with Image.open(avydata).resize((200,200), resample=Image.BILINEAR).convert('RGBA') as avy:
+        with Image.open(avydata).resize((200,200), resample=Image.BICUBIC).convert('RGBA') as avy:
             with Image.open('piestatustest2.png').convert('L') as mask:
                 base.paste(avy, (50,50), avy)
                 draw = ImageDraw.Draw(piebase)
@@ -174,10 +174,12 @@ class Stats:
                         draw.pieslice(((-5,-5),(305,305)),starting, v, fill=status[k])
                         starting = v
                 if not 360 in stat_deg:
+                    mult = 1000
+                    offset = 150
                     for k, v in angles.items():
-                        x = 150 + ceil(15000 * cos(radians(v)))/100
-                        y = 150 + ceil(15000 * sin(radians(v)))/100
-                        draw.line(((150, 150), (x, y)), fill=(255,255,255,255), width=1)
+                        x = offset + ceil(offset * mult * cos(radians(v))) / mult
+                        y = offset + ceil(offset * mult * sin(radians(v))) / mult
+                        draw.line(((offset, offset), (x, y)), fill=(255,255,255,255), width=1)
                 del maskdraw
                 piebase.putalpha(mask)
         font = ImageFont.truetype("arial.ttf", 15)
