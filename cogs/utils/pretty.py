@@ -4,7 +4,7 @@ def delta_to_str(start, end):
         end, start = start, end
         msg += '-'
     diff = end - start
-    d, s = divmod(diff.total_seconds(), 86400)
+    d, s = divmod(int(diff.total_seconds()), 86400)
     h, s = divmod(s, 3600)
     m, s = divmod(s, 60)
     msg = ''

@@ -4,6 +4,7 @@ import imp
 import time
 import datetime
 from io import BytesIO
+from .utils import pretty
 import asyncio
 import aiohttp
 import json
@@ -27,20 +28,20 @@ class Stats:
         if target.id == self.bot.user.id:
             return await ctx.send("I cannot see myself...")
         msg = f'{target.display_name} has been **{target.status.name}** for as long as I can tell...'
+        msg2 = ''
         status_info = offline_info = None
         status_info = await self.bot.pool.fetchval('''
             with lagged as(
                 select
                     status,
                     lag(status) over (order by first_seen asc) as status_lag,
-                    first_seen,
-                    now() at time zone 'utc' - first_seen as since
+                    first_seen
                 from statuses
                 where (uid=$1 or uid=0) and
                     first_seen > now() at time zone 'utc' - interval '30 days'
             )
             select distinct on (status)
-                since
+                first_seen
             from lagged
             where 
                 status != status_lag and
@@ -54,50 +55,34 @@ class Stats:
                     select
                         status,
                         lag(status) over (order by first_seen asc) as status_lag,
-                        first_seen,
-                        now() at time zone 'utc' - first_seen as since
+                        first_seen
                     from statuses
                     where (uid=$1 or uid=0) and
                         first_seen > now() at time zone 'utc' - interval '30 days'
                 )
                 select
-                    since
+                    first_seen
                 from lagged
                 where
                     status != 'offline' and status_lag = 'offline'
-                order by since asc
+                order by first_seen desc
                 limit 1
             ''', target.id)
              
-        if status_info:   
-            msg = f'{target.display_name} has been **{target.status.name}** for '
-            d, s = divmod(int(status_info.total_seconds()), 86400)
-            h, s = divmod(s, 3600)
-            m, s = divmod(s, 60)
-            if d != 0:
-                msg += '{}d {}h {}m'.format(d, h, m)
-            elif h != 0:
-                msg += '{}h {}m'.format(h, m)
-            else:
-                msg += '{}m'.format(m)
+        if status_info:
+            utcnow = datetime.datetime.utcnow()
+            time = pretty.delta_to_str(status_info, utcnow)
+            msg = f'{target.display_name} has been **{target.status.name}** for {time}.'
                 
             if target.status.name != 'offline':
                 if offline_info:
-                    msg += '\nLast **offline** '
-                    d, s = divmod(int(offline_info.total_seconds()), 86400)
-                    h, s = divmod(s, 3600)
-                    m, s = divmod(s, 60)
-                    if d != 0:
-                        msg += '{}d {}h {}m'.format(d, h, m)
-                    elif h != 0:
-                        msg += '{}h {}m'.format(h, m)
-                    else:
-                        msg += '{}m'.format(m)
-                    msg += ' ago.'
+                    time = pretty.delta_to_str(offline_info, utcnow)
+                    msg2 = f'Last **offline** {time} ago.'
                 else:
-                    msg += '\nHas not been seen offline in the last 30 days as far as I can tell...'
+                    msg2 = 'Has not been seen offline in the last 30 days as far as I can tell...'
+
             
-        await ctx.send(msg)
+        await ctx.send(f'{msg}\n{msg2}')
 
     @commands.command()
     async def piestatus(self, ctx, target : discord.Member = None):
@@ -333,6 +318,74 @@ class Stats:
         if tz > 12 or tz < -12:
             tz = 0
         target = target or ctx.author
+        query = '''
+            with status_data as(
+                select
+                    status,
+                    first_seen_chopped as first_seen,
+                    case when 
+                        lag(first_seen_chopped) over (order by first_seen desc) is null then
+                            now() at time zone 'utc'
+                        else
+                            lag(first_seen_chopped) over (order by first_seen desc)
+                    end as last_seen
+                from (
+                    select
+                        distinct on (first_seen_chopped)
+                        first_seen,
+                        case when first_seen < (now() at time zone 'utc' - interval '30 days') then
+                            (now() at time zone 'utc' - interval '30 days')
+                            else first_seen end as first_seen_chopped,
+                        status,
+                        lag(status) over (order by first_seen desc) as status_last
+                    from ( 
+                        select status, first_seen
+                        from koi.statuses
+                        where uid=0
+                        union all
+                        select status, first_seen
+                        from statuses
+                        where uid=230365801457123328
+                        order by first_seen desc
+                        limit 2000
+                    ) first2000
+                    order by first_seen_chopped desc, first_seen desc
+                ) subtable
+                where
+                    status is distinct from status_last
+                order by first_seen desc
+            )
+            select
+                s.hours,
+                s.status,
+                sum(
+                case 
+                    when date_trunc('hour', s.last_seen) = s.hours and
+                         date_trunc('hour', s.first_seen) = s.hours then
+                         s.last_seen - s.first_seen
+                    when date_trunc('hour', s.first_seen) = s.hours then 
+                         (s.hours + interval '1 hour') - s.first_seen
+                    when date_trunc('hour', s.last_seen) = s.hours then
+                         s.last_seen - s.hours
+                    else
+                        interval '1 hour'
+                end
+                )
+            from (
+                select
+                    status,
+                    first_seen,
+                    last_seen,
+                    generate_series(
+                        date_trunc('hour', first_seen),
+                        date_trunc('hour', case when last_seen is null then now() at time zone 'utc' else last_seen end),
+                        '1 hours'
+                    ) as hours
+                from status_data
+            ) as s
+            group by s.hours, s.status
+            order by s.hours desc
+        '''
         
 def setup(bot):
     bot.add_cog(Stats(bot))
