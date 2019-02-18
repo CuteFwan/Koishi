@@ -110,15 +110,16 @@ class Stats:
                             status,
                             lag(status) over (order by first_seen desc) as status_last
                         from  ( 
-                            select status, first_seen
-                            from koi.statuses
+                            (select status, first_seen
+                            from statuses
                             where uid=0
+                            order by first_seen desc)
                             union all
-                            select status, first_seen
+                            (select status, first_seen
                             from statuses
                             where uid=$1
                             order by first_seen desc
-                            limit 2000
+                            limit 2000)
                         ) first2000
                         order by first_seen_chopped desc, first_seen desc
                     ) subtable
@@ -225,15 +226,16 @@ class Stats:
                             status,
                             lag(status) over (order by first_seen desc) as status_last
                         from  ( 
-                            select status, first_seen
-                            from koi.statuses
+                            (select status, first_seen
+                            from statuses
                             where uid=0
+                            order by first_seen desc)
                             union all
-                            select status, first_seen
+                            (select status, first_seen
                             from statuses
                             where uid=$1
                             order by first_seen desc
-                            limit 2000
+                            limit 2000)
                         ) first2000
                         order by first_seen_chopped desc, first_seen desc
                     ) subtable
@@ -357,6 +359,15 @@ class Stats:
                     status is distinct from status_last
                 order by first_seen desc
             )
+            select 
+                extract(hour from whatever) as hours,
+                sum(online) as online,
+                sum(away) as away,
+                sum(dnd) as dnd,
+                sum(offline) as offline,
+                sum(fucked) as fucked
+            from crosstab(
+            $$
             select
                 s.hours,
                 s.status,
@@ -387,7 +398,17 @@ class Stats:
             ) as s
             group by s.hours, s.status
             order by s.hours desc
-        '''
+            $$,
+            $$ select unnest(array['online','idle','dnd','offline','Left_Guild']) $$)
+            as ct(whatever timestamp, 
+                  online interval, 
+                  away interval, 
+                  dnd interval, 
+                  offline interval, 
+                  fucked interval)
+            group by hours
+            order by hours
+            '''
         
 def setup(bot):
     bot.add_cog(Stats(bot))
