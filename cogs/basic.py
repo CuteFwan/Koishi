@@ -25,9 +25,9 @@ class Basic:
     @commands.command()
     async def uptime(self, ctx):
         current_time = datetime.datetime.utcnow()
-        msg = pretty.delta_to_str(self.bot.start_time, current_time)
+        time = pretty.delta_to_str(self.bot.start_time, current_time)
         
-        await ctx.send(f'for {msg} so far')
+        await ctx.send(f'for {time} so far')
 
     
 def setup(bot):

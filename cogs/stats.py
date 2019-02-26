@@ -344,10 +344,11 @@ class Stats:
                         lag(status) over (order by first_seen desc) as status_last
                     from ( 
                         select status, first_seen
-                        from koi.statuses
+                        from statuses
                         where uid=0
+                        order by first_seen desc)
                         union all
-                        select status, first_seen
+                        (select status, first_seen
                         from statuses
                         where uid=$1
                         order by first_seen desc

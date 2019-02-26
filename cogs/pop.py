@@ -51,6 +51,7 @@ class Pop:
         self.pending_updates = {recordtype : [] for recordtype in scheme.keys()}
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
         self.synced = asyncio.Event()
+        self.first_synced = False
         
     def __unload(self):
         print('die')
@@ -104,15 +105,17 @@ class Pop:
         await self.bot.pool.execute(query, transformed)
 
     async def on_ready(self):
-        utcnow = datetime.datetime.utcnow()
+        if self.first_synced == False:
+            utcnow = datetime.datetime.utcnow()
 
-        await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
-        
-        for m in list(set(self.bot.get_all_members())):
-            self.add_user(m, utcnow)
-        await asyncio.gather(*[self.insert_to_db(recordtype) for recordtype in scheme.keys()])
-        self.synced.set()
-        print("synced!")
+            await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
+            
+            for m in list(set(self.bot.get_all_members())):
+                self.add_user(m, utcnow)
+            await asyncio.gather(*[self.insert_to_db(recordtype) for recordtype in scheme.keys()])
+            self.synced.set()
+            self.first_synced = True
+            print("synced!")
 
     def add_user(self, m, utcnow, full = True):
         self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
