@@ -360,10 +360,13 @@ class Stats:
                     status is distinct from status_last
                 order by first_seen desc
             )
-            select hour, status, extract(epoch from total) / extract(epoch from max(total) over ())
+            select
+                hour,
+                case when status = 'idle' then 'away' else status end,
+                extract(epoch from total) / extract(epoch from max(total) over ()) as percent
             from (
                 select
-                    mod((extract(hour from s.hours)+$2)::integer, 24) as hour,
+                    mod((extract(hour from s.hours)+$2+24)::integer, 24) as hour,
                     s.status,
                     sum(
                     case 
@@ -395,7 +398,94 @@ class Stats:
                 group by hour, s.status
                 order by hour asc
             ) a
+            order by hour asc
             '''
+        async with ctx.channel.typing():
+            utcnow = datetime.datetime.utcnow()
+            start_time = time.perf_counter()
+            data = await self.bot.pool.fetch(query, target.id, tz)
+            query_done_time = time.perf_counter()
+            current_hour = utcnow.hour + tz
+            output = await self.bot.loop.run_in_executor(None, self._histostatus, f'{target.display_name}\'s resturant hours', data, current_hour, tz)
+            generated_time = time.perf_counter()
+            await ctx.send(file=discord.File(output, filename=f'{target.id} histostatus {utcnow.replace(microsecond=0,second=0,minute=0)}.png'))
+            finish_time = time.perf_counter()
+            msg = f'query done in **{(query_done_time - start_time)*1000:.2f}ms**'
+            msg += f'\nimage built in **{(generated_time - query_done_time)*1000:.2f}ms**'
+            msg += f'\nsent image in **{(finish_time - generated_time)*1000:.2f}ms**'
+            msg += f'\ntotal time **{(finish_time - start_time)*1000:.2f}ms**'
+            await ctx.send(f'*{msg}*')
         
+    def _histostatus(self, title, data, current_hour, tz):
+        box_size = (400,300)
+        #base = Image.new(mode='RGBA', size=box_size, color=(0, 0, 0, 0))
+        with Image.new(mode='RGBA',size=box_size) as base:
+            draw = ImageDraw.Draw(base)
+            x = 24
+            spacing = 16
+            draw_y0 = 0
+            draw_y1 = box_size[1]-30
+            trans_font = (*discord_neutral, 50)
+            font = ImageFont.truetype("arial.ttf", 12)
+            graphsize = 255
+            top_offset = 15
+            for i in range(25):
+                #Draw numbers
+                draw_x = x+spacing*i-8
+                draw.line(((draw_x,draw_y0),(draw_x,draw_y1)),fill=trans_font, width=1)
+                draw.line(((draw_x, draw_y1), (draw_x, draw_y1+top_offset)), fill=discord_neutral, width=1)
+                if i != 24:
+                    if i == current_hour:
+                        fontcolor = (0,255,0,255)
+                    else:
+                        fontcolor = discord_neutral
+                    draw.text((draw_x+1,draw_y1), f'{i:02}', fill=fontcolor, font=font)
+            draw.text((340,draw_y1+16), f'{"+" if tz >= 0 else ""}{tz}', fill=discord_neutral, font=font)
+            draw.text((2,2),title, fill=discord_neutral,font=font)
+
+            first = {'online':0,'away':0,'dnd':0,'offline':0}
+            for d in data:
+                if d['hour'] == 0:
+                    first[d['status']] = d['percent']
+                else:
+                    break
+            prev = {'online':0,'away':0,'dnd':0,'offline':0}
+            for d in data[::-1]:
+                if d['hour'] == 23:
+                    prev[d['status']] = d['percent']
+                else:
+                    break
+
+            curr = {'online':0,'away':0,'dnd':0,'offline':0}
+            hour = 0
+            for d in data:
+                if hour == d['hour']:
+                    curr[d['status']] = d['percent']
+                elif hour + 1 == d['hour']
+                    for stat in prev.keys():
+                        x0 = x - spacing
+                        y0 = (graphsize - (prev[stat]*graphsize)) + top_offset
+                        x1 = x
+                        y1 = (graphsize - (curr[stat]*graphsize)) + top_offset
+                        draw.line(((x0,y0),(x1,y1)), fill=status[stat], width=1)
+                        draw.ellipse(((x1-1,y1-1),(x1+1,y1+1)), fill=status[stat])
+                    prev = curr
+                    curr = {'online':0,'away':0,'dnd':0,'offline':0}
+                    curr[d['status']] = d['percent']
+                    hour += 1
+                    x += spacing
+            for k, v in prev.items():
+                x0 = x - spacing
+                y0 = (graphsize - v*graphsize) + top_offset
+                x1 = x
+                y1 = (graphsize - first[k]*graphsize) + top_offset
+                draw.line(((x0,y0),(x1,y1)), fill=status[k], width=1)
+
+            del draw
+            buffer = BytesIO()
+            base.save(buffer, 'png')
+        buffer.seek(0)
+        return buffer
+
 def setup(bot):
     bot.add_cog(Stats(bot))
