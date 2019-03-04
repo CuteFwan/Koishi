@@ -67,7 +67,6 @@ class Pop:
         try:
             interval = min(max(1,interval),60)
             await self.bot.wait_until_ready()
-            await self.synced.wait()
             while True:
                 await asyncio.sleep(interval)
                 await self.insert_to_db(recordtype)
@@ -86,6 +85,7 @@ class Pop:
         print(f'trying to insert {len(to_insert)} to {recordtype}')
         async with self.bot.pool.acquire() as con:
             result = await con.copy_records_to_table(recordtype, records=to_insert, columns=scheme[recordtype].keys(),schema_name='koi_test')
+            print(result)
 
     async def insert_to_db_2(self, recordtype):
         to_insert = self.pending_updates[recordtype]
@@ -109,15 +109,30 @@ class Pop:
             utcnow = datetime.datetime.utcnow()
 
             await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
-            
-            for m in list(set(self.bot.get_all_members())):
-                self.add_user(m, utcnow)
-            await asyncio.gather(*[self.insert_to_db(recordtype) for recordtype in scheme.keys()])
+            self.fill_updates(0, 0, 'cog_online', utcnow, True)
+            self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
             self.synced.set()
             self.first_synced = True
             print("synced!")
 
-    def add_user(self, m, utcnow, full = True):
+    def add_bulk_members(self, members, utcnow):
+        for m in members:
+            self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
+        print(len(list(set(members))))
+        for m in list(set(members)):
+            self.pending_updates['names'].append((m.id, m.name, utcnow))
+            self.pending_updates['avatars'].append((
+                                                    m.id,
+                                                    m.avatar if m.avatar else m.default_avatar.name,
+                                                    m.avatar_url_as(static_format='png'),
+                                                    f'/{m.id}/{m.avatar}.{"gif" if m.is_avatar_animated() else "png"}',
+                                                    utcnow
+                                                  ))
+            self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
+            self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
+            self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
+
+    def add_member(self, m, utcnow, full = True):
         self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
         if full:
             self.pending_updates['names'].append((m.id, m.name, utcnow))
@@ -147,7 +162,7 @@ class Pop:
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
         do_full = sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 1
-        self.add_user(member, utcnow, do_full)
+        self.add_member(member, utcnow, do_full)
 
     async def on_member_remove(self, member):
         await self.synced.wait()
@@ -190,8 +205,7 @@ class Pop:
         """
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
-        for member in guild.members:
-            self.add_user(member, utcnow)
+        self.add_bulk_members(guild.members, utcnow)
         print(f'Added {guild.member_count} people to queues!')
 
     async def on_guild_remove(self, guild):

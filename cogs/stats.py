@@ -461,7 +461,7 @@ class Stats:
             for d in data:
                 if hour == d['hour']:
                     curr[d['status']] = d['percent']
-                elif hour + 1 == d['hour']
+                elif hour + 1 == d['hour']:
                     for stat in prev.keys():
                         x0 = x - spacing
                         y0 = (graphsize - (prev[stat]*graphsize)) + top_offset
