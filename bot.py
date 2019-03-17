@@ -26,7 +26,6 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-
 description = '''Lies and slander follow'''
 bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or('!'), description=description)
 
@@ -116,4 +115,3 @@ if __name__ == "__main__":
             print(f'Failed to load extension {extension}.', file=sys.stderr)
             traceback.print_exc()
     run()
-    

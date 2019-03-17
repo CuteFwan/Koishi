@@ -53,7 +53,7 @@ class Pop:
         self.synced = asyncio.Event()
         self.first_synced = False
         
-    def __unload(self):
+    def cog_unload(self):
         print('die')
         utcnow = datetime.datetime.utcnow()
         for recordtype in scheme.keys():
