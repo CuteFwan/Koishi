@@ -18,7 +18,7 @@ status = {'online':(67, 181, 129),
           'offline':(116, 127, 141)}
 discord_neutral = (188,188,188)
 
-class Stats:
+class Stats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         

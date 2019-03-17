@@ -45,7 +45,7 @@ scheme = {
          }
 
 
-class Pop:
+class Pop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.pending_updates = {recordtype : [] for recordtype in scheme.keys()}

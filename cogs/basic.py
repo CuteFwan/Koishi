@@ -4,7 +4,7 @@ import time
 import datetime
 from .utils import pretty
 
-class Basic:
+class Basic(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
