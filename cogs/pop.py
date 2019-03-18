@@ -104,6 +104,7 @@ class Pop(commands.Cog):
                 '''
         await self.bot.pool.execute(query, transformed)
 
+    @commands.Cog.listener()
     async def on_ready(self):
         if self.first_synced == False:
             utcnow = datetime.datetime.utcnow()
@@ -157,19 +158,21 @@ class Pop(commands.Cog):
             self.pending_updates['statuses'].append((uid, msg, utcnow))
             self.pending_updates['games'].append((uid, msg, utcnow))
 
-
+    @commands.Cog.listener()
     async def on_member_join(self, member):
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
         do_full = sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 1
         self.add_member(member, utcnow, do_full)
 
+    @commands.Cog.listener()
     async def on_member_remove(self, member):
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
         do_full = sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 0
         self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, do_full) #untested stuff
-
+    
+    @commands.Cog.listener()
     async def on_member_update(self, before, after):
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
@@ -198,6 +201,7 @@ class Pop(commands.Cog):
             if before.activity != after.activity and not after.bot:
                 self.pending_updates['games'].append((aid, after.activity.name if after.activity else None, utcnow))
 
+    @commands.Cog.listener()
     async def on_guild_join(self, guild):
         """
             It is rare to have too many dups of members in new guilds.
@@ -208,6 +212,7 @@ class Pop(commands.Cog):
         self.add_bulk_members(guild.members, utcnow)
         print(f'Added {guild.member_count} people to queues!')
 
+    @commands.Cog.listener()
     async def on_guild_remove(self, guild):
         """
             Figuring out which users the bot can still see is important.

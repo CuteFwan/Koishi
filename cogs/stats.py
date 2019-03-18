@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import imp
 import time
 import datetime
 from io import BytesIO
