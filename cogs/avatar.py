@@ -8,6 +8,21 @@ from PIL import Image
 from io import BytesIO
 from .utils import images
 
+class Timetracker:
+    def __init__(self, title, *values):
+        self.title = title
+        self.values = values
+        self.times = [time.perf_counter()]
+    
+    def update(self):
+        self.times.append(time.perf_counter())
+
+    def display(self):
+        msg = self.title
+        for i, value in enumerate(self.values):
+            msg += f'\n{value}: {f"{(self.times[i+1] - self.times[i])*1000:.2f}ms" if i+1 < len(self.times) else "..."}'
+        return msg
+
 class Avatar(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -15,43 +30,44 @@ class Avatar(commands.Cog):
 
     @commands.command()
     async def avyquilt(self, ctx, member : discord.Member = None):
-        async with ctx.channel.typing():
-            member = member or ctx.author
-            query = '''
-                select
-                    avy_urls.url
-                from koi.avatars
-                left join koi.avy_urls on
-                    avy_urls.hash = avatars.avatar
-                where
-                    avatars.uid = $1
-                order by avatars.first_seen desc
-            '''
+        member = member or ctx.author
 
-            start_time = time.perf_counter()
+        query = '''
+            select
+                avy_urls.url
+            from koi.avatars
+            left join koi.avy_urls on
+                avy_urls.hash = avatars.avatar
+            where
+                avatars.uid = $1
+            order by avatars.first_seen desc
+        '''
 
-            urls = await ctx.bot.pool.fetch(query, member.id)
+        tracker = Timetracker('', 'queried', 'downloaded', 'created file')
+        msg = await ctx.send(tracker.display())
 
-            query_time = time.perf_counter()
-            print(f'{(query_time - start_time)*1000:.2f}ms to query')
+        urls = await ctx.bot.pool.fetch(query, member.id)
 
-            async def url_to_bytes(url):
-                if not url:
-                    return None
-                async with ctx.bot.session.get(url) as r:
-                    return BytesIO(await r.read())
+        tracker.update()
+        await msg.edit(content=tracker.display())
 
-            avys = await asyncio.gather(*[url_to_bytes(url['url']) for url in urls])
+        async def url_to_bytes(url):
+            if not url:
+                return None
+            async with ctx.bot.session.get(url) as r:
+                return BytesIO(await r.read())
 
-            dl_time = time.perf_counter()
-            print(f'{(dl_time - query_time)*1000:.2f}ms to dl avatars')
+        avys = await asyncio.gather(*[url_to_bytes(url['url']) for url in urls])
 
-            file = await ctx.bot.loop.run_in_executor(None, self._avyquilt, avys)
+        tracker.update()
+        await msg.edit(content=tracker.display())
 
-            write_time = time.perf_counter()
-            print(f'{(write_time - dl_time)*1000:.2f}ms to write file')
+        file = await ctx.bot.loop.run_in_executor(None, self._avyquilt, avys)
 
-            await ctx.send(file=discord.File(file, f'{member.id}_avyquilt.png'))
+        tracker.update()
+        await msg.edit(content=tracker.display())
+
+        await ctx.send(file=discord.File(file, f'{member.id}_avyquilt.png'))
 
     def _avyquilt(self, avatars):
         xbound = math.ceil(math.sqrt(len(avatars)))
