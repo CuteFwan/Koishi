@@ -35,12 +35,22 @@ class Avatar(commands.Cog):
         query = '''
             select
                 avy_urls.url
-            from koi.avatars
+            from (
+                select
+                    avatar, first_seen
+                from (
+                    select
+                        avatar, lag(avatar) over (order by first_seen desc) as avatar_old, first_seen
+                    from koi.avatars
+                    where
+                        avatars.uid = $1
+                ) a
+                where
+                    avatar != avatar_old or avatar_old is null
+            ) avys
             left join koi.avy_urls on
-                avy_urls.hash = avatars.avatar
-            where
-                avatars.uid = $1
-            order by avatars.first_seen desc
+                avy_urls.hash = avys.avatar
+            order by avys.first_seen desc
         '''
 
         tracker = Timetracker('', 'queried', 'downloaded', 'created file')

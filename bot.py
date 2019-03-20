@@ -19,6 +19,9 @@ SERVER_INVITE = config["SERVER_INVITE"]
 DB_URI = config["DB_URI"]
 TOKEN = config["TOKEN"]
 STARTUP_EXTENSIONS = config["STARTUP_EXTENSIONS"]
+ADMINS = config["ADMINS"]
+AVY_GUILD = config["AVY_GUILD"]
+AVY_CHANNEL = config["AVY_CHANNEL"]
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -28,10 +31,15 @@ logger.addHandler(handler)
 
 description = '''Lies and slander follow'''
 bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or('!'), description=description)
+bot.avy_guild = AVY_GUILD
+bot.avy_channel = AVY_CHANNEL
+bot.admins = ADMINS
+bot.bot_invite = BOT_INVITE
+bot.server_invite = SERVER_INVITE
 
 @bot.check
 async def make_sure_nobody_else_uses_this_bot(ctx):
-    if ctx.author.id in [109778500260528128, 145802776247533569]:
+    if ctx.author.id in ADMINS:
         return True
     return False
 
@@ -85,10 +93,9 @@ async def create_pool(uri, **kwargs):
             await extra_init(conn)
     return await asyncpg.create_pool(uri, init=init, **kwargs)
     
-def run():
-    loop = asyncio.get_event_loop()
+async def run():
     try:
-        pool = loop.run_until_complete(create_pool(DB_URI))
+        pool = await create_pool(DB_URI)
         print('Connected to postgresql server')
     except Exception as e:
         print('Could not set up postgresql')
@@ -96,13 +103,11 @@ def run():
         return
     bot.session = aiohttp.ClientSession()
     bot.pool = pool
-    bot.bot_invite = BOT_INVITE
-    bot.server_invite = SERVER_INVITE
     bot.start_time = datetime.datetime.utcnow()
     try:
-        loop.run_until_complete(bot.start(TOKEN))
+        await bot.start(TOKEN)
     except KeyboardInterrupt:
-        loop.run_until_complete(bot.logout())
+        await bot.logout()
     finally:
         loop.close()
         
@@ -114,4 +119,5 @@ if __name__ == "__main__":
         except Exception as e:
             print(f'Failed to load extension {extension}.', file=sys.stderr)
             traceback.print_exc()
-    run()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run())
