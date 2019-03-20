@@ -81,7 +81,6 @@ class Pop(commands.Cog):
         self.avatars = []
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
         self.bg_avy_task = self.bot.loop.create_task(self.batch_post_avatars())
-        self.bg_tasks = {'avatars' : self.bot.loop.create_task(self.batching_task('avatars'))}
         self.synced = asyncio.Event()
         self.wh = None
         self.first_synced = False
@@ -89,9 +88,9 @@ class Pop(commands.Cog):
     def cog_unload(self):
         print('die')
         utcnow = datetime.datetime.utcnow()
-        for recordtype in scheme.keys():
+        for recordtype, task in self.bg_tasks.items():
             print(f'canceling {recordtype}')
-            self.bg_tasks[recordtype].cancel()
+            task.cancel()
         self.fill_updates(0, 0, 'cog_offline', utcnow, True)
 
 
@@ -164,10 +163,8 @@ class Pop(commands.Cog):
     async def batch_post_avatars(self):
         print('started avatar posting task')
         try:
-            print('try')
             await self.bot.wait_until_ready()
             while True:
-                print('while')
                 while not self.wh:
                     self.wh = discord.utils.get(await self.bot.get_guild(self.bot.avy_guild).webhooks(), channel_id=self.bot.avy_channel)
                     if self.wh:
@@ -201,7 +198,7 @@ class Pop(commands.Cog):
                         return (hash, BytesIO(await r.read()))
 
                 posting_queue = deque(await asyncio.gather(*[url_to_bytes(avy[0], avy[1], self.bot.session) for avy in posting_queue]))
-
+                print('downloaded?')
                 while len(posting_queue) > 0:
                     to_post = {}
                     post_size = 0
@@ -215,16 +212,18 @@ class Pop(commands.Cog):
                             new_bytes = None
                             if avy[0].startswith('a_'):
                                 new_bytes = await self.bot.loop.run_in_executor(None, self._extract_first_frame, avy[1])
-                                
                             else:
                                 new_bytes = await self.bot.loop.run_in_executor(None, images.resize_to_limit, avy[1], 8000000)
                             posting_queue.appendleft((avy[0], new_bytes))
                         else:
                             posting_queue.appendleft((avy[0], avy[1]))
+                            break
                     if len(to_post) == 0:
                         #Nothing left to post
+                        print('nothing to post from the batch?')
                         break
                     try:
+                        print('posting')
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
                         transformed = [
                             {
@@ -247,6 +246,7 @@ class Pop(commands.Cog):
                         await self.bot.pool.execute(query, transformed)
                     except discord.HTTPException:
                         print('something happened')
+                print('sssssss')
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
             print('Batching task for avatar posting was cancelled')

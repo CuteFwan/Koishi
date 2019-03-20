@@ -30,7 +30,7 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 description = '''Lies and slander follow'''
-bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or('!'), description=description)
+bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or('b+'), description=description)
 bot.avy_guild = AVY_GUILD
 bot.avy_channel = AVY_CHANNEL
 bot.admins = ADMINS
