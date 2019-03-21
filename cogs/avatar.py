@@ -41,14 +41,14 @@ class Avatar(commands.Cog):
                 from (
                     select
                         avatar, lag(avatar) over (order by first_seen desc) as avatar_old, first_seen
-                    from koi.avatars
+                    from avatars
                     where
                         avatars.uid = $1
                 ) a
                 where
                     avatar != avatar_old or avatar_old is null
             ) avys
-            left join koi.avy_urls on
+            left join avy_urls on
                 avy_urls.hash = avys.avatar
             order by avys.first_seen desc
         '''

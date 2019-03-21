@@ -8,7 +8,7 @@ import asyncio
 import aiohttp
 import json
 import typing
-from numpy import cos, sin, radians, ceil
+from math import cos, sin, radians, ceil
 from PIL import Image, ImageOps, ImageDraw, ImageFilter, ImageEnhance, ImageFont
 
 status = {'online':(67, 181, 129),
