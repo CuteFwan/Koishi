@@ -50,7 +50,8 @@ async def on_ready():
     print('Running', discord.__version__)
 
 @bot.command(hidden=True)
-async def dreload(ctx, extension_name: str):
+@commands.is_owner()
+async def backupreload(ctx, extension_name: str):
     bot.unload_extension(extension_name)
     try:
         bot.load_extension(extension_name)
@@ -61,6 +62,7 @@ async def dreload(ctx, extension_name: str):
     await ctx.send("{} reloaded.".format(extension_name))
 
 @bot.command(hidden=True)
+@commands.is_owner()
 async def logout(ctx):
     await ctx.send('goodbye')
     await bot.logout()

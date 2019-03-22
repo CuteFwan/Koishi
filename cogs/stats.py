@@ -84,6 +84,7 @@ class Stats(commands.Cog):
         await ctx.send(f'{msg}\n{msg2}')
 
     @commands.command()
+    @commands.is_owner()
     async def piestatus(self, ctx, target : discord.Member = None):
         '''Generates a pie chart displaying the ratios between the statuses the bot has seen the user use.'''
         target = target or ctx.author
@@ -200,6 +201,7 @@ class Stats(commands.Cog):
 
 
     @commands.command()
+    @commands.is_owner()
     async def barstatus(self, ctx, target : discord.Member = None):
         '''Generates a bar graph of each status the bot has seen the user use.'''
         target = target or ctx.author
@@ -317,6 +319,7 @@ class Stats(commands.Cog):
         return stat, word
 
     @commands.command()
+    @commands.is_owner()
     async def histostatus(self, ctx, target : typing.Optional[discord.Member] = None , tz : int = 0):
         if tz > 12 or tz < -12:
             tz = 0
