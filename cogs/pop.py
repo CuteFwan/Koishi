@@ -251,8 +251,6 @@ class Pop(commands.Cog):
                             await self.bot.pool.execute(query, transformed)
                         except discord.HTTPException:
                             print('something happened')
-                        except Exception as e:
-                            print(e)
         except asyncio.CancelledError:
             print('Batching task for avatar posting was cancelled')
 
