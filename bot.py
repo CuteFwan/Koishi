@@ -22,6 +22,7 @@ STARTUP_EXTENSIONS = config["STARTUP_EXTENSIONS"]
 ADMINS = config["ADMINS"]
 AVY_GUILD = config["AVY_GUILD"]
 AVY_CHANNEL = config["AVY_CHANNEL"]
+DEFAULT_PREFIX = config["DEFAULT_PREFIX"]
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -30,18 +31,13 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 description = '''Lies and slander follow'''
-bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or('b+'), description=description)
+bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or(DEFAULT_PREFIX), description=description)
 bot.avy_guild = AVY_GUILD
 bot.avy_channel = AVY_CHANNEL
 bot.admins = ADMINS
 bot.bot_invite = BOT_INVITE
 bot.server_invite = SERVER_INVITE
 
-@bot.check
-async def make_sure_nobody_else_uses_this_bot(ctx):
-    if ctx.author.id in ADMINS:
-        return True
-    return False
 
 @bot.event
 async def on_ready():
