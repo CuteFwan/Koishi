@@ -418,7 +418,7 @@ class Stats(commands.Cog):
     def _histostatus(self, title, data, current_hour, tz):
         box_size = (400,300)
         #base = Image.new(mode='RGBA', size=box_size, color=(0, 0, 0, 0))
-        with Image.new(mode='RGBA',size=box_size) as base:
+        with Image.open('histogram_template2.png') as base:
             draw = ImageDraw.Draw(base)
             x = 24
             spacing = 16
