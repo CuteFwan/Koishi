@@ -19,7 +19,7 @@ class Admin(commands.Cog):
 
     @commands.command(hidden=True)
     async def sql(self, ctx, *, query):
-        """Owner only"""
+        """Copied from old bot"""
         start = time.perf_counter()
         rows = await self.bot.pool.fetch(query)
         mid = time.perf_counter()
@@ -36,8 +36,7 @@ class Admin(commands.Cog):
 
     @commands.command(hidden=True)
     async def eval(self, ctx, *, code : str):
-        """Owner only"""
-        '''Creates easter bunnies in your server'''
+        """Copied from old bot"""
         code = code.strip('` ')
         python = '```py\n{}\n```'
         result = None
@@ -76,7 +75,7 @@ class Admin(commands.Cog):
     
     @commands.command(hidden=True)
     async def py(self, ctx, *, body: str):
-        """Owner only"""
+        """Copied from old bot"""
         env = {
             'bot': self.bot,
             'ctx': ctx,
