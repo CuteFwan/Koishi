@@ -51,6 +51,7 @@ class Avatar(commands.Cog):
             left join avy_urls on
                 avy_urls.hash = avys.avatar
             order by avys.first_seen desc
+            limit 100
         '''
 
         tracker = Timetracker('', 'queried', 'downloaded', 'created file')
