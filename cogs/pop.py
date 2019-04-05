@@ -176,6 +176,7 @@ class Pop(commands.Cog):
                     await asyncio.sleep(2)
 
                 working_queue = self.avatars.copy()
+                self.avatars.clear()
 
                 query = '''
                     select hash
@@ -187,6 +188,7 @@ class Pop(commands.Cog):
                 results = [r['hash'] for r in results]
                 for r in results:
                     working_queue.pop(r, None)
+
 
                 while len(working_queue) > 0:
                     print(f'{len(working_queue)} left to post')
