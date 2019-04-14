@@ -285,13 +285,13 @@ class Pop(commands.Cog):
             self.pending_updates['avatars'].append((
                                                     m.id,
                                                     m.avatar if m.avatar else m.default_avatar.name,
-                                                    m.avatar_url_as(static_format='png'),
+                                                    str(m.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
             self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
             self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-            self.avatars[m.avatar if m.avatar else m.default_avatar.name] = m.avatar_url_as(static_format='png')
+            self.avatars[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
 
     def add_member(self, m, utcnow, full = True):
@@ -301,13 +301,13 @@ class Pop(commands.Cog):
             self.pending_updates['avatars'].append((
                                                     m.id,
                                                     m.avatar if m.avatar else m.default_avatar.name,
-                                                    m.avatar_url_as(static_format='png'),
+                                                    str(m.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
             self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
             self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-            self.avatars[m.avatar if m.avatar else m.default_avatar.name] = m.avatar_url_as(static_format='png')
+            self.avatars[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
     def fill_updates(self, uid, sid, msg, utcnow, full = True):
         print(f'running fill_updates with {full}')
@@ -345,10 +345,10 @@ class Pop(commands.Cog):
             self.pending_updates['avatars'].append((
                                                     aid,
                                                     after.avatar if after.avatar else after.default_avatar.name,
-                                                    after.avatar_url_as(static_format='png'),
+                                                    str(after.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
-            self.avatars[after.avatar if after.avatar else after.default_avatar.name] = after.avatar_url_as(static_format='png')
+            self.avatars[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
         if before.discriminator != after.discriminator:
             self.pending_updates['discrims'].append((aid, after.discriminator, utcnow))
         if before.nick != after.nick:
