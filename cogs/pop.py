@@ -333,8 +333,9 @@ class Pop(commands.Cog):
         do_full = sum(1 for g in self.bot.guilds if g.get_member(member.id)) == 0
         self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, do_full) #untested stuff
     
+
     @commands.Cog.listener()
-    async def on_member_update(self, before, after):
+    async def on_user_update(self, before, after):
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
         aid = after.id
@@ -351,6 +352,13 @@ class Pop(commands.Cog):
             self.avatars[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
         if before.discriminator != after.discriminator:
             self.pending_updates['discrims'].append((aid, after.discriminator, utcnow))
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        await self.synced.wait()
+        utcnow = datetime.datetime.utcnow()
+        aid = after.id
+
         if before.nick != after.nick:
             self.pending_updates['nicks'].append((aid, after.guild.id, after.nick, utcnow))
 
