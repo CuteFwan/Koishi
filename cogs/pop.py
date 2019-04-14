@@ -160,7 +160,7 @@ class Pop(commands.Cog):
     async def batch_post_avatars(self):
         print('started avatar posting task')
         async def url_to_bytes(hash, url, session):
-            async with session.get(url) as r:
+            async with session.get(str(url)) as r:
                 return (hash, BytesIO(await r.read()))
         try:
             await self.bot.wait_until_ready()

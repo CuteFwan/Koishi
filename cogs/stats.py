@@ -137,7 +137,7 @@ class Stats(commands.Cog):
                 group by status
                 order by sum desc
             ''', target.id)
-            async with self.bot.session.get(target.avatar_url_as(format='png')) as r:
+            async with self.bot.session.get(str(target.avatar_url_as(format='png'))) as r:
                 avydata = BytesIO(await r.read())
             data = dict()
             for row in rows:
