@@ -270,7 +270,7 @@ class Pop(commands.Cog):
             utcnow = datetime.datetime.utcnow()
 
             await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
-            self.fill_updates(0, 0, 'cog_online', utcnow, True)
+            self.fill_updates(0, 0, 'cog_online', utcnow - datetime.timedelta(microseconds=1), True)
             self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
             self.synced.set()
             self.first_synced = True
