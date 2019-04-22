@@ -26,7 +26,7 @@ class Stats(commands.Cog):
         target = target or ctx.author
         if target.id == self.bot.user.id:
             return await ctx.send("I cannot see myself...")
-        msg = f'{target.display_name} has been **{target.status.name}** for as long as I can tell...'
+        msg = f'`{target.display_name} `has been **{target.status.name}** for as long as I can tell...'
         msg2 = ''
         status_info = offline_info = None
         status_info = await self.bot.pool.fetchval('''
@@ -71,7 +71,7 @@ class Stats(commands.Cog):
         if status_info:
             utcnow = datetime.datetime.utcnow()
             time = pretty.delta_to_str(status_info, utcnow)
-            msg = f'{target.display_name} has been **{target.status.name}** for {time}.'
+            msg = f'`{target.display_name} `has been **{target.status.name}** for {time}.'
                 
             if target.status.name != 'offline':
                 if offline_info:
