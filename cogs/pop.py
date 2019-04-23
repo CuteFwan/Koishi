@@ -226,6 +226,8 @@ class Pop(commands.Cog):
                             else:
                                 overflow = (avy, file)
                                 break
+                        if len(to_post) == 0:
+                            break
                             
                         while len(to_post) > 0:
                             try:
