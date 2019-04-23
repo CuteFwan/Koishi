@@ -249,7 +249,7 @@ class Pop(commands.Cog):
                                     on conflict (hash) do nothing
                                 '''
                                 await self.bot.pool.execute(query, transformed)
-                                print('nothing to post from the batch?')
+
                                 break
                             except discord.HTTPException:
                                 print('something happened')
