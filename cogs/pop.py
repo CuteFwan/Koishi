@@ -255,7 +255,7 @@ class Pop(commands.Cog):
                                 break
                             except discord.HTTPException:
                                 print('something happened')
-                            except ConnectionError:
+                            except aiohttp.ClientOSError:
                                 print('discord big gay')
                             
                             
