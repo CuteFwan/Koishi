@@ -226,33 +226,37 @@ class Pop(commands.Cog):
                             else:
                                 overflow = (avy, file)
                                 break
-                        if len(to_post) == 0:
-                            #Nothing left to post
-                            print('nothing to post from the batch?')
-                            break
-                        try:
-                            message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
-                            transformed = [
-                                {
-                                    'hash' : a.filename[::-1].split('.', 1)[-1][::-1],
-                                    'url' : a.url,
-                                    'msgid' : message.id,
-                                    'id' : a.id,
-                                    'size' : a.size,
-                                    'height' : a.height,
-                                    'width' : a.width
-                                } for a in message.attachments
-                            ]
-                            query = '''
-                                insert into avy_urls
-                                (hash, url, msgid, id, size, height, width)
-                                select x.hash, x.url, x.msgid, x.id, x.size, x.height, x.width
-                                from jsonb_to_recordset($1::jsonb) as x(hash text, url text, msgid bigint, id bigint, size bigint, height bigint, width bigint)
-                                on conflict (hash) do nothing
-                            '''
-                            await self.bot.pool.execute(query, transformed)
-                        except discord.HTTPException:
-                            print('something happened')
+                            
+                        while len(to_post) > 0:
+                            try:
+                                message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
+                                transformed = [
+                                    {
+                                        'hash' : a.filename[::-1].split('.', 1)[-1][::-1],
+                                        'url' : a.url,
+                                        'msgid' : message.id,
+                                        'id' : a.id,
+                                        'size' : a.size,
+                                        'height' : a.height,
+                                        'width' : a.width
+                                    } for a in message.attachments
+                                ]
+                                query = '''
+                                    insert into avy_urls
+                                    (hash, url, msgid, id, size, height, width)
+                                    select x.hash, x.url, x.msgid, x.id, x.size, x.height, x.width
+                                    from jsonb_to_recordset($1::jsonb) as x(hash text, url text, msgid bigint, id bigint, size bigint, height bigint, width bigint)
+                                    on conflict (hash) do nothing
+                                '''
+                                await self.bot.pool.execute(query, transformed)
+                                print('nothing to post from the batch?')
+                                break
+                            except discord.HTTPException:
+                                print('something happened')
+                            except ConnectionError:
+                                print('discord big gay')
+                            
+                            
         except asyncio.CancelledError:
             print('Batching task for avatar posting was cancelled')
 
