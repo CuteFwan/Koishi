@@ -78,9 +78,11 @@ class Pop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.pending_updates = {recordtype : [] for recordtype in scheme.keys()}
-        self.avatars = dict()
+        self.avy_urls = dict()
+        self.avy_posting_queue = asyncio.Queue(maxsize = 50)
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
-        self.bg_avy_task = self.bot.loop.create_task(self.batch_post_avatars())
+        self.post_avy_task = self.bot.loop.create_task(self.batch_post_avatars())
+        self.dl_avys_task = self.bot.loop.create_task(self.dl_avys())
         self.synced = asyncio.Event()
         self.wh = None
         self.first_synced = False
@@ -88,6 +90,8 @@ class Pop(commands.Cog):
     def cog_unload(self):
         print('die')
         utcnow = datetime.datetime.utcnow()
+        self.post_avy_task.cancel()
+        self.dl_avys_task.cancel()
         for recordtype, task in self.bg_tasks.items():
             print(f'canceling {recordtype}')
             task.cancel()
@@ -157,11 +161,43 @@ class Pop(commands.Cog):
                 '''
         await self.bot.pool.execute(query, transformed)
 
-    async def batch_post_avatars(self):
-        print('started avatar posting task')
+    async def dl_avys(self):
+        print('started avatar downloading task')
         async def url_to_bytes(hash, url, session):
             async with session.get(str(url)) as r:
                 return (hash, BytesIO(await r.read()))
+        try:
+            await self.bot.wait_until_ready()
+            while True:
+                while len(self.avy_urls) == 0:
+                    await asyncio.sleep(2)
+                query = '''
+                    select hash
+                    from avy_urls
+                    where
+                        hash = any($1::text[])
+                '''
+                results = await self.bot.pool.fetch(query, self.avy_urls.keys())
+                for r in results:
+                    # remove items in the avatar url dict that are already in the db
+                    self.avy_urls.pop(r['hash'], None)
+
+                chunk = dict()
+                while len(self.avy_urls) > 0 and len(chunk) < (50 - self.avy_posting_queue.qsize()):
+                    # grabs enough avatars to fill the posting queue with 50 avatars if possible
+                    avy, url = self.avy_urls.popitem()
+                    chunk[avy] = url
+                if len(chunk):
+                    avatar_data = await asyncio.gather(*[url_to_bytes(avy, url, self.bot.session) for avy, url in chunk.items()])
+                    for avatar in avatar_data:
+                        await self.avy_posting_queue.put(avatar)
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            print('avatar downloading task canceled')
+
+
+    async def batch_post_avatars(self):
+        print('started avatar posting task')
         try:
             await self.bot.wait_until_ready()
             while True:
@@ -172,92 +208,63 @@ class Pop(commands.Cog):
                         break
                     else:
                         await asyncio.sleep(2)
-                while len(self.avatars) == 0:
+                if self.avy_posting_queue.qsize() == 0:
                     await asyncio.sleep(2)
 
-                working_queue = self.avatars.copy()
-                self.avatars.clear()
-
-                query = '''
-                    select hash
-                    from avy_urls
-                    where
-                        hash = any($1::text[])
-                '''
-                results = await self.bot.pool.fetch(query, working_queue.keys())
-                results = [r['hash'] for r in results]
-                for r in results:
-                    working_queue.pop(r, None)
-
-
-                while len(working_queue) > 0:
-                    print(f'{len(working_queue)} left to post')
-                    dl_queue = dict()
-
-                    for i in range(30):
-                        if len(working_queue) > 0:
-                            avy, url = working_queue.popitem()
-                            dl_queue[avy] = url
+                to_post = {}
+                post_size = 0
+                while len(to_post) < 10 and self.avy_posting_queue.qsize() > 0:
+                    avy, file = await self.avy_posting_queue.get()
+                    s = file.getbuffer().nbytes
+                    if post_size + s < 8000000:
+                        post_size += s
+                        to_post[avy] = discord.File(file, filename=f'{avy}.{"png" if not avy.startswith("a_") else "gif"}')
+                    elif s > 8000000:
+                        new_bytes = None
+                        if avy.startswith('a_'):
+                            new_bytes = await self.bot.loop.run_in_executor(None, self._extract_first_frame, file)
                         else:
-                            break
+                            new_bytes = await self.bot.loop.run_in_executor(None, images.resize_to_limit, file, 8000000)
+                        await self.avy_posting_queue.put((avy, new_bytes))
+                        continue
+                    else:
+                        await self.avy_posting_queue.put((avy, file))
+                        break
+                if len(to_post) == 0:
+                    continue
+                for tries in range(5):
+                    for avy, file in to_post.items():
+                        file.reset(seek=tries)
+                    try:
+                        message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
+                        transformed = [
+                            {
+                                'hash' : a.filename[::-1].split('.', 1)[-1][::-1],
+                                'url' : a.url,
+                                'msgid' : message.id,
+                                'id' : a.id,
+                                'size' : a.size,
+                                'height' : a.height,
+                                'width' : a.width
+                            } for a in message.attachments
+                        ]
+                        query = '''
+                            insert into avy_urls
+                            (hash, url, msgid, id, size, height, width)
+                            select x.hash, x.url, x.msgid, x.id, x.size, x.height, x.width
+                            from jsonb_to_recordset($1::jsonb) as x(hash text, url text, msgid bigint, id bigint, size bigint, height bigint, width bigint)
+                            on conflict (hash) do nothing
+                        '''
+                        await self.bot.pool.execute(query, transformed)
+                        break
+                    except discord.HTTPException:
+                        print('something happened')
+                    except aiohttp.ClientOSError:
+                        print('discord big gay')
+                    except ValueError:
+                        print('for some reason the file is closed')
+                    await asyncio.sleep(2 + 2 * tries)
 
-                    posting_queue = dict(await asyncio.gather(*[url_to_bytes(avy, url, self.bot.session) for avy, url in dl_queue.items()]))
-
-                    overflow = None
-                    while len(posting_queue) > 0:
-                        to_post = {}
-                        post_size = 0
-                        while len(to_post) < 10 and len(posting_queue) > 0:
-                            avy, file = posting_queue.popitem() if not overflow else overflow
-                            if overflow:
-                                overflow = None
-                            s = file.getbuffer().nbytes
-                            if post_size + s < 8000000:
-                                post_size += s
-                                to_post[avy] = discord.File(file, filename=f'{avy}.{"png" if not avy.startswith("a_") else "gif"}')
-                            elif s > 8000000:
-                                new_bytes = None
-                                if avy.startswith('a_'):
-                                    new_bytes = await self.bot.loop.run_in_executor(None, self._extract_first_frame, file)
-                                else:
-                                    new_bytes = await self.bot.loop.run_in_executor(None, images.resize_to_limit, file, 8000000)
-                                overflow = (avy, new_bytes)
-                                continue
-                            else:
-                                overflow = (avy, file)
-                                break
-                        if len(to_post) == 0:
-                            break
-                            
-                        while len(to_post) > 0:
-                            try:
-                                message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
-                                transformed = [
-                                    {
-                                        'hash' : a.filename[::-1].split('.', 1)[-1][::-1],
-                                        'url' : a.url,
-                                        'msgid' : message.id,
-                                        'id' : a.id,
-                                        'size' : a.size,
-                                        'height' : a.height,
-                                        'width' : a.width
-                                    } for a in message.attachments
-                                ]
-                                query = '''
-                                    insert into avy_urls
-                                    (hash, url, msgid, id, size, height, width)
-                                    select x.hash, x.url, x.msgid, x.id, x.size, x.height, x.width
-                                    from jsonb_to_recordset($1::jsonb) as x(hash text, url text, msgid bigint, id bigint, size bigint, height bigint, width bigint)
-                                    on conflict (hash) do nothing
-                                '''
-                                await self.bot.pool.execute(query, transformed)
-
-                                break
-                            except discord.HTTPException:
-                                print('something happened')
-                            except aiohttp.ClientOSError:
-                                print('discord big gay')
-                            
                             
         except asyncio.CancelledError:
             print('Batching task for avatar posting was cancelled')
@@ -297,7 +304,7 @@ class Pop(commands.Cog):
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
             self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
             self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-            self.avatars[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
+            self.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
 
     def add_member(self, m, utcnow, full = True):
@@ -313,7 +320,7 @@ class Pop(commands.Cog):
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
             self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
             self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-            self.avatars[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
+            self.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
     def fill_updates(self, uid, sid, msg, utcnow, full = True):
         print(f'running fill_updates with {full}')
@@ -355,7 +362,7 @@ class Pop(commands.Cog):
                                                     str(after.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
-            self.avatars[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
+            self.avy_urls[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
         if before.discriminator != after.discriminator:
             self.pending_updates['discrims'].append((aid, after.discriminator, utcnow))
 
