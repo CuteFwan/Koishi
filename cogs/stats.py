@@ -22,7 +22,7 @@ class Stats(commands.Cog):
         self.bot = bot
         
     @commands.command()
-    async def myuptime(self, ctx, target : discord.Member = None):
+    async def useruptime(self, ctx, target : discord.Member = None):
         target = target or ctx.author
         if target.id == self.bot.user.id:
             return await ctx.send("I cannot see myself...")
