@@ -163,9 +163,13 @@ class Pop(commands.Cog):
 
     async def dl_avys(self):
         print('started avatar downloading task')
-        async def url_to_bytes(hash, url, session):
-            async with session.get(str(url)) as r:
-                return (hash, BytesIO(await r.read()))
+        async def url_to_bytes(hash, url):
+            async with self.bot.session.get(str(url)) as r:
+                if r.status == 200:
+                    await self.avy_posting_queue.put((hash, BytesIO(await r.read())))
+                else:
+                    # unsuccessful, put it back in for next round
+                    self.avy_urls[hash] = url
         try:
             await self.bot.wait_until_ready()
             while True:
@@ -187,10 +191,8 @@ class Pop(commands.Cog):
                     # grabs enough avatars to fill the posting queue with 50 avatars if possible
                     avy, url = self.avy_urls.popitem()
                     chunk[avy] = url
-                if len(chunk):
-                    avatar_data = await asyncio.gather(*[url_to_bytes(avy, url, self.bot.session) for avy, url in chunk.items()])
-                    for avatar in avatar_data:
-                        await self.avy_posting_queue.put(avatar)
+                if chunk:
+                    await asyncio.gather(*[url_to_bytes(avy, url) for avy, url in chunk.items()])
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
             print('avatar downloading task canceled')
