@@ -164,12 +164,15 @@ class Pop(commands.Cog):
     async def dl_avys(self):
         print('started avatar downloading task')
         async def url_to_bytes(hash, url):
-            async with self.bot.session.get(str(url)) as r:
-                if r.status == 200:
-                    await self.avy_posting_queue.put((hash, BytesIO(await r.read())))
-                else:
-                    # unsuccessful, put it back in for next round
-                    self.avy_urls[hash] = url
+            try:
+                async with self.bot.session.get(str(url)) as r:
+                    if r.status == 200:
+                        await self.avy_posting_queue.put((hash, BytesIO(await r.read())))
+                    else:
+                        # unsuccessful, put it back in for next round
+                        self.avy_urls[hash] = url
+            except asyncio.TimeoutError:
+                self.avy_urls[hash] = url
         try:
             await self.bot.wait_until_ready()
             while True:
