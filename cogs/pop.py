@@ -274,7 +274,7 @@ class Pop(commands.Cog):
                         print(f'{len(backup)} failed to upload. retrying')
                     except discord.HTTPException:
                         print('something happened')
-                    except aiohttp.ClientOSError:
+                    except aiohttp.ClientError:
                         print('discord big gay')
                     except ValueError:
                         print('for some reason the file is closed')
