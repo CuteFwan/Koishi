@@ -243,7 +243,7 @@ class Pop(commands.Cog):
                         transformed = []
                         for a in message.attachments:
                             if a.height:
-                                file_hash = a.filename[::-1].split('.', 1)[-1][::-1]
+                                file_hash = os.path.splitext(a.filename)[0]
                                 transformed.append(
                                     {
                                         'hash' : file_hash,
