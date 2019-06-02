@@ -47,8 +47,8 @@ with status_data as(
             from statuses
             where uid=$1
             order by first_seen desc
-            limit 2000)
-        ) first2000
+            limit 3000)
+        ) first3000
         order by first_seen_chopped desc, first_seen desc
     ) subtable
     where
