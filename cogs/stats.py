@@ -410,8 +410,8 @@ class Stats(commands.Cog):
         buffer.seek(0)
         return buffer
 
-    @commands.command()
-    async def hourlystatus(self, ctx, target : discord.Member = None):
+    @commands.command(aliases = ['hourlystatus'])
+    async def calendarstatus(self, ctx, target : discord.Member = None):
         '''shows hourly presence data. Each row is a day. WIP'''
         target = target or ctx.author
         query = query_base + '''
@@ -454,9 +454,9 @@ class Stats(commands.Cog):
             '''
         async with ctx.channel.typing():
             data = await ctx.bot.pool.fetch(query, target.id)
-            output = await self.bot.loop.run_in_executor(None, self._hourlystatus, data)
+            output = await self.bot.loop.run_in_executor(None, self._calendarstatus, data)
             await ctx.send(file=discord.File(output, filename='test.png'))
-    def _hourlystatus(self, data):
+    def _calendarstatus(self, data):
         base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
         pix = base.load()
         status_percent = {}
