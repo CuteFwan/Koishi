@@ -234,7 +234,7 @@ class Pop(commands.Cog):
                     continue
                 for tries in range(5):
                     for avy, file in to_post.items():
-                        file.reset(seek=tries)
+                        file.fp.seek(0)
                     try:
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
                         transformed = [
