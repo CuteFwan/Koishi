@@ -410,6 +410,86 @@ class Stats(commands.Cog):
         buffer.seek(0)
         return buffer
 
+    @commands.command()
+    async def hourlystatus(self, ctx, target : discord.Member = None):
+        '''shows hourly presence data. Each row is a day. WIP'''
+        target = target or ctx.author
+        query = query_base + '''
+            select
+                s.hours as timestamp,
+                extract(day from s.hours) as day,
+                extract(hour from s.hours) as hour,
+                case when s.status = 'idle' then 'away' else s.status end,
+                sum(
+                    extract(EPOCH from 
+                        case 
+                            when date_trunc('hour', s.last_seen) = s.hours and
+                                 date_trunc('hour', s.first_seen) = s.hours then
+                                 s.last_seen - s.first_seen
+                            when date_trunc('hour', s.first_seen) = s.hours then 
+                                 (s.hours + interval '1 hour') - s.first_seen
+                            when date_trunc('hour', s.last_seen) = s.hours then
+                                 s.last_seen - s.hours
+                            else
+                                interval '1 hour'
+                        end
+                    )/3600
+                )as percent
+            from (
+                select
+                    status,
+                    first_seen,
+                    last_seen,
+                    generate_series(
+                        date_trunc('hour', first_seen),
+                        date_trunc('hour', case when last_seen is null then now() at time zone 'utc' else last_seen end),
+                        '1 hours'
+                    ) as hours
+                from status_data
+                where
+                    status in ('offline', 'idle', 'online', 'dnd')
+            ) as s
+            group by timestamp, status
+            order by timestamp, hour asc
+            '''
+        async with ctx.channel.typing():
+            data = await ctx.bot.pool.fetch(query, target.id)
+            output = await self.bot.loop.run_in_executor(None, self._spectostatus, data)
+            await ctx.send(file=discord.File(output, filename='test.png'))
+    def _hourlystatus(self, data):
+        base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
+        pix = base.load()
+        status_percent = {}
+        prev_timestamp = data[0]['timestamp']
+        prev_day = data[0]['day']
+        y = 0
+        for d in data:
+            if d['day'] != prev_day:
+                y += 1
+                prev_day = d['day']
+            if prev_timestamp != d['timestamp']:
+                x = d['hour']
+                pix[x,y] = self._calculate_color(status_percent, status)
+                prev_timestamp = d['timestamp']
+                status_percent = {}
+            status_percent[d['status']] = d['percent']
+
+        base = base.crop((0,0,24,y+1))
+        base = base.resize((400,base.size[1]),Image.NEAREST)
+        base = base.resize((400,300),Image.NEAREST)
+
+        buffer = BytesIO()
+        base.save(buffer, 'png')
+        buffer.seek(0)
+        return buffer
+
+
+
+    def _calculate_color(self, percent, colors):
+        '''Why did I do this in a single line?'''
+        return tuple(int(sum(percent[status] * colors[status][i] for status, value in percent.items())) for i in range(3))
+
+
 
 def setup(bot):
     bot.add_cog(Stats(bot))
