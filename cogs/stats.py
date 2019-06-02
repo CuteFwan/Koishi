@@ -17,6 +17,46 @@ status = {'online':(67, 181, 129),
           'offline':(116, 127, 141)}
 discord_neutral = (188,188,188)
 
+query_base = '''
+with status_data as(
+    select
+        status,
+        first_seen_chopped as first_seen,
+        case when 
+            lag(first_seen_chopped) over (order by first_seen desc) is null then
+                now() at time zone 'utc'
+            else
+                lag(first_seen_chopped) over (order by first_seen desc)
+        end as last_seen
+    from (
+        select
+            distinct on (first_seen_chopped)
+            first_seen,
+            case when first_seen < (now() at time zone 'utc' - interval '30 days') then
+                (now() at time zone 'utc' - interval '30 days')
+                else first_seen end as first_seen_chopped,
+            status,
+            lag(status) over (order by first_seen desc) as status_last
+        from ( 
+            (select status, first_seen
+            from statuses
+            where uid=0
+            order by first_seen desc)
+            union all
+            (select status, first_seen
+            from statuses
+            where uid=$1
+            order by first_seen desc
+            limit 2000)
+        ) first2000
+        order by first_seen_chopped desc, first_seen desc
+    ) subtable
+    where
+        status is distinct from status_last
+    order by first_seen desc
+)
+'''
+
 class Stats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -88,44 +128,7 @@ class Stats(commands.Cog):
         '''Generates a pie chart displaying the ratios between the statuses the bot has seen the user use.'''
         target = target or ctx.author
         async with ctx.channel.typing():
-            rows = await self.bot.pool.fetch('''
-                with status_data as(
-                    select
-                        status,
-                        first_seen_chopped as first_seen,
-                        case when 
-                            lag(first_seen_chopped) over (order by first_seen desc) is null then
-                                now() at time zone 'utc'
-                            else
-                                lag(first_seen_chopped) over (order by first_seen desc)
-                        end as last_seen
-                    from (
-                        select
-                            distinct on (first_seen_chopped)
-                            first_seen,
-                            case when first_seen < (now() at time zone 'utc' - interval '30 days') then
-                                (now() at time zone 'utc' - interval '30 days')
-                                else first_seen end as first_seen_chopped,
-                            status,
-                            lag(status) over (order by first_seen desc) as status_last
-                        from  ( 
-                            (select status, first_seen
-                            from statuses
-                            where uid=0
-                            order by first_seen desc)
-                            union all
-                            (select status, first_seen
-                            from statuses
-                            where uid=$1
-                            order by first_seen desc
-                            limit 2000)
-                        ) first2000
-                        order by first_seen_chopped desc, first_seen desc
-                    ) subtable
-                    where
-                        status is distinct from status_last
-                    order by first_seen desc
-                )
+            rows = await self.bot.pool.fetch(query_base + '''
                 select
                     status,
                     sum(
@@ -204,44 +207,7 @@ class Stats(commands.Cog):
         '''Generates a bar graph of each status the bot has seen the user use.'''
         target = target or ctx.author
         async with ctx.channel.typing():
-            rows = await self.bot.pool.fetch('''
-                with status_data as(
-                    select
-                        status,
-                        first_seen_chopped as first_seen,
-                        case when 
-                            lag(first_seen_chopped) over (order by first_seen desc) is null then
-                                now() at time zone 'utc'
-                            else
-                                lag(first_seen_chopped) over (order by first_seen desc)
-                        end as last_seen
-                    from (
-                        select
-                            distinct on (first_seen_chopped)
-                            first_seen,
-                            case when first_seen < (now() at time zone 'utc' - interval '30 days') then
-                                (now() at time zone 'utc' - interval '30 days')
-                                else first_seen end as first_seen_chopped,
-                            status,
-                            lag(status) over (order by first_seen desc) as status_last
-                        from  ( 
-                            (select status, first_seen
-                            from statuses
-                            where uid=0
-                            order by first_seen desc)
-                            union all
-                            (select status, first_seen
-                            from statuses
-                            where uid=$1
-                            order by first_seen desc
-                            limit 2000)
-                        ) first2000
-                        order by first_seen_chopped desc, first_seen desc
-                    ) subtable
-                    where
-                        status is distinct from status_last
-                    order by first_seen desc
-                )
+            rows = await self.bot.pool.fetch(query_base + '''
                 select
                     status,
                     sum(
@@ -321,44 +287,7 @@ class Stats(commands.Cog):
         if tz > 12 or tz < -12:
             tz = 0
         target = target or ctx.author
-        query = '''
-            with status_data as(
-                select
-                    status,
-                    first_seen_chopped as first_seen,
-                    case when 
-                        lag(first_seen_chopped) over (order by first_seen desc) is null then
-                            now() at time zone 'utc'
-                        else
-                            lag(first_seen_chopped) over (order by first_seen desc)
-                    end as last_seen
-                from (
-                    select
-                        distinct on (first_seen_chopped)
-                        first_seen,
-                        case when first_seen < (now() at time zone 'utc' - interval '30 days') then
-                            (now() at time zone 'utc' - interval '30 days')
-                            else first_seen end as first_seen_chopped,
-                        status,
-                        lag(status) over (order by first_seen desc) as status_last
-                    from ( 
-                        (select status, first_seen
-                        from statuses
-                        where uid=0
-                        order by first_seen desc)
-                        union all
-                        (select status, first_seen
-                        from statuses
-                        where uid=$1
-                        order by first_seen desc
-                        limit 2000)
-                    ) first2000
-                    order by first_seen_chopped desc, first_seen desc
-                ) subtable
-                where
-                    status is distinct from status_last
-                order by first_seen desc
-            )
+        query = query_base + '''
             select
                 hour,
                 case when status = 'idle' then 'away' else status end,
@@ -443,19 +372,14 @@ class Stats(commands.Cog):
             draw.text((2,2),title, fill=discord_neutral,font=font)
 
             first = {'online':0,'away':0,'dnd':0,'offline':0}
+            curr = {'online':0,'away':0,'dnd':0,'offline':0}
+            prev = {'online':0,'away':0,'dnd':0,'offline':0}
             for d in data:
                 if d['hour'] == 0:
                     first[d['status']] = d['percent']
-                else:
-                    break
-            prev = {'online':0,'away':0,'dnd':0,'offline':0}
-            for d in data[::-1]:
                 if d['hour'] == 23:
                     prev[d['status']] = d['percent']
-                else:
-                    break
 
-            curr = {'online':0,'away':0,'dnd':0,'offline':0}
             hour = 0
             for d in data:
                 if hour == d['hour']:
@@ -485,6 +409,7 @@ class Stats(commands.Cog):
             base.save(buffer, 'png')
         buffer.seek(0)
         return buffer
+
 
 def setup(bot):
     bot.add_cog(Stats(bot))
