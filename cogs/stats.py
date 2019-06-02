@@ -454,7 +454,7 @@ class Stats(commands.Cog):
             '''
         async with ctx.channel.typing():
             data = await ctx.bot.pool.fetch(query, target.id)
-            output = await self.bot.loop.run_in_executor(None, self._spectostatus, data)
+            output = await self.bot.loop.run_in_executor(None, self._hourlystatus, data)
             await ctx.send(file=discord.File(output, filename='test.png'))
     def _hourlystatus(self, data):
         base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
