@@ -62,7 +62,7 @@ class Stats(commands.Cog):
         self.bot = bot
         
     @commands.command()
-    async def useruptime(self, ctx, target : discord.Member = None):
+    async def useruptime(self, ctx, *, target : discord.Member = None):
         target = target or ctx.author
         if target.id == self.bot.user.id:
             return await ctx.send("I cannot see myself...")
@@ -124,7 +124,7 @@ class Stats(commands.Cog):
         await ctx.send(f'{msg}\n{msg2}')
 
     @commands.command()
-    async def piestatus(self, ctx, target : discord.Member = None):
+    async def piestatus(self, ctx, *, target : discord.Member = None):
         '''Generates a pie chart displaying the ratios between the statuses the bot has seen the user use.'''
         target = target or ctx.author
         async with ctx.channel.typing():
@@ -203,7 +203,7 @@ class Stats(commands.Cog):
 
 
     @commands.command()
-    async def barstatus(self, ctx, target : discord.Member = None):
+    async def barstatus(self, ctx, *, target : discord.Member = None):
         '''Generates a bar graph of each status the bot has seen the user use.'''
         target = target or ctx.author
         async with ctx.channel.typing():
@@ -411,7 +411,7 @@ class Stats(commands.Cog):
         return buffer
 
     @commands.command(aliases = ['hourlystatus'])
-    async def calendarstatus(self, ctx, target : discord.Member = None):
+    async def calendarstatus(self, ctx, *, target : discord.Member = None):
         '''shows hourly presence data. Each row is a day. WIP'''
         target = target or ctx.author
         query = query_base + '''
