@@ -411,8 +411,11 @@ class Stats(commands.Cog):
         return buffer
 
     @commands.command(aliases = ['hourlystatus'])
-    async def calendarstatus(self, ctx, *, target : discord.Member = None):
+    async def calendarstatus(self, ctx, target : typing.Optional[discord.Member] = None , tz : int = 0):
         '''shows hourly presence data. Each row is a day. WIP'''
+        if tz > 12 or tz < -12:
+            tz = 0
+        tz_delta = datetime.timedelta(hours=tz)
         target = target or ctx.author
         query = query_base + '''
             select
@@ -438,11 +441,11 @@ class Stats(commands.Cog):
             from (
                 select
                     status,
-                    first_seen,
-                    last_seen,
+                    first_seen + $2 as first_seen,
+                    last_seen + $2 as last_seen,
                     generate_series(
-                        date_trunc('hour', first_seen),
-                        date_trunc('hour', case when last_seen is null then now() at time zone 'utc' else last_seen end),
+                        date_trunc('hour', first_seen + $2),
+                        date_trunc('hour', case when last_seen is null then now() at time zone 'utc' else last_seen end + $2),
                         '1 hours'
                     ) as hours
                 from status_data
@@ -453,10 +456,10 @@ class Stats(commands.Cog):
             order by timestamp, hour asc
             '''
         async with ctx.channel.typing():
-            data = await ctx.bot.pool.fetch(query, target.id)
-            output = await self.bot.loop.run_in_executor(None, self._calendarstatus, data)
+            data = await ctx.bot.pool.fetch(query, target.id, tz_delta)
+            output = await self.bot.loop.run_in_executor(None, self._calendarstatus, data, tz)
             await ctx.send(file=discord.File(output, filename='test.png'))
-    def _calendarstatus(self, data):
+    def _calendarstatus(self, data, tz):
         base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
         pix = base.load()
         status_percent = {}
