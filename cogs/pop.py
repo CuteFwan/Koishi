@@ -233,11 +233,11 @@ class Pop(commands.Cog):
                 if len(to_post) == 0:
                     continue
 
-                backup = {k : BytesIO(v.getbuffer()) for k, v in to_post.items()}
+                backup = {k : BytesIO(v.fp.getbuffer()) for k, v in to_post.items()}
 
                 for tries in range(5):
                     if tries > 0:
-                        to_post = {k : BytesIO(v.getbuffer()) for k, v in backup.items()}
+                        to_post = {k : BytesIO(v.fp.getbuffer()) for k, v in backup.items()}
                     try:
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
                         transformed = [
