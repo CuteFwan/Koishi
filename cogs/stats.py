@@ -333,7 +333,7 @@ class Stats(commands.Cog):
             start_time = time.perf_counter()
             data = await self.bot.pool.fetch(query, target.id, tz)
             query_done_time = time.perf_counter()
-            current_hour = utcnow.hour + tz
+            current_hour = (utcnow.hour + tz) % 24
             output = await self.bot.loop.run_in_executor(None, self._histostatus, f'{target.display_name}\'s resturant hours', data, current_hour, tz)
             generated_time = time.perf_counter()
             await ctx.send(file=discord.File(output, filename=f'{target.id} histostatus {utcnow.replace(microsecond=0,second=0,minute=0)}.png'))
