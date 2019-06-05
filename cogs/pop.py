@@ -237,7 +237,7 @@ class Pop(commands.Cog):
 
                 for tries in range(5):
                     if tries > 0:
-                        to_post = {k : Discord.File(BytesIO(v.fp.getbuffer())) for k, v in backup.items()}
+                        to_post = {k : discord.File(BytesIO(v.fp.getbuffer())) for k, v in backup.items()}
                     try:
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
                         transformed = [
