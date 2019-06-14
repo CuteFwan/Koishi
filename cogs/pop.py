@@ -171,7 +171,7 @@ class Pop(commands.Cog):
                     else:
                         # unsuccessful, put it back in for next round
                         self.avy_urls[hash] = url
-            except asyncio.TimeoutError:
+            except (asyncio.TimeoutError, aiohttp.ClientError):
                 self.avy_urls[hash] = url
         try:
             await self.bot.wait_until_ready()
