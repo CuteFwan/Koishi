@@ -222,7 +222,7 @@ class Pop(commands.Cog):
                     elif s > 8000000:
                         new_bytes = None
                         if avy.startswith('a_'):
-                            new_bytes = await self.bot.loop.run_in_executor(None, self._extract_first_frame, file)
+                            new_bytes = await self.bot.loop.run_in_executor(None, images.extract_first_frame, file)
                         else:
                             new_bytes = await self.bot.loop.run_in_executor(None, images.resize_to_limit, file, 8000000)
                         await self.avy_posting_queue.put((avy, new_bytes))
@@ -281,13 +281,6 @@ class Pop(commands.Cog):
         except asyncio.CancelledError:
             print('Batching task for avatar posting was cancelled')
 
-    def _extract_first_frame(self, data):
-        with Image.open(data) as im:
-            im = im.convert('RGBA')
-            b = BytesIO()
-            im.save(b, 'gif')
-            b.seek(0)
-            return b
 
     @commands.Cog.listener()
     async def on_ready(self):

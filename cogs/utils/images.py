@@ -32,3 +32,11 @@ def resize_to_limit(data, limit):
             data.seek(0)
             current_size = data.getbuffer().nbytes
     return data
+
+def extract_first_frame(data):
+    with Image.open(data) as im:
+        im = im.convert('RGBA')
+        b = BytesIO()
+        im.save(b, 'gif')
+        b.seek(0)
+        return b
