@@ -240,17 +240,22 @@ class Pop(commands.Cog):
                         to_post = {k : discord.File(BytesIO(v.fp.getbuffer())) for k, v in backup.items()}
                     try:
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
-                        transformed = [
-                            {
-                                'hash' : a.filename[::-1].split('.', 1)[-1][::-1],
-                                'url' : a.url,
-                                'msgid' : message.id,
-                                'id' : a.id,
-                                'size' : a.size,
-                                'height' : a.height,
-                                'width' : a.width
-                            } for a in message.attachments
-                        ]
+                        transformed = []
+                        for a in message.attachments:
+                            if a.height:
+                                file_hash = a.filename[::-1].split('.', 1)[-1][::-1]
+                                transformed.append(
+                                    {
+                                        'hash' : file_hash,
+                                        'url' : a.url,
+                                        'msgid' : message.id,
+                                        'id' : a.id,
+                                        'size' : a.size,
+                                        'height' : a.height,
+                                        'width' : a.width
+                                    }
+                                )
+                                backup.pop(file_hash)
                         query = '''
                             insert into avy_urls
                             (hash, url, msgid, id, size, height, width)
@@ -259,7 +264,9 @@ class Pop(commands.Cog):
                             on conflict (hash) do nothing
                         '''
                         await self.bot.pool.execute(query, transformed)
-                        break
+                        if len(backup) == 0:
+                            break
+                        print(f'{len(backup)} failed to upload. retrying')
                     except discord.HTTPException:
                         print('something happened')
                     except aiohttp.ClientOSError:
