@@ -237,7 +237,7 @@ class Pop(commands.Cog):
 
                 for tries in range(5):
                     if tries > 0:
-                        to_post = {k : discord.File(BytesIO(v.getbuffer())) for k, v in backup.items()}
+                        to_post = {k : discord.File(BytesIO(v.getbuffer()), filename=f'{k}.{"png" if not k.startswith("a_") else "gif"}') for k, v in backup.items()}
                     try:
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
                         transformed = []
@@ -274,6 +274,8 @@ class Pop(commands.Cog):
                     except ValueError:
                         print('for some reason the file is closed')
                     await asyncio.sleep(2 + 2 * tries)
+
+
 
                             
         except asyncio.CancelledError:
