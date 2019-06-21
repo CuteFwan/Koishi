@@ -465,6 +465,7 @@ class Stats(commands.Cog):
         status_percent = {}
         prev_timestamp = data[0]['timestamp']
         prev_day = data[0]['day']
+        first = True
         y = 0
         for d in data:
             if d['day'] != prev_day:
@@ -473,25 +474,32 @@ class Stats(commands.Cog):
             if prev_timestamp != d['timestamp']:
                 x = d['hour']
                 pix[x,y] = self._calculate_color(status_percent, status)
+                if first:
+                    print(status_percent)
+                    first = False
                 prev_timestamp = d['timestamp']
                 status_percent = {}
             status_percent[d['status']] = d['percent']
 
         base = base.crop((0,0,24,y+1))
-        base = base.resize((400,base.size[1]),Image.NEAREST)
-        base = base.resize((400,300),Image.NEAREST)
+        new_base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
+        new_base.paste(base, box=(0,30-y),mask=base)
+        new_base = new_base.resize((400,new_base.size[1]),Image.NEAREST)
+        new_base = new_base.resize((400,300),Image.NEAREST)
 
         buffer = BytesIO()
-        base.save(buffer, 'png')
+        new_base.save(buffer, 'png')
         buffer.seek(0)
         return buffer
 
 
 
     def _calculate_color(self, percent, colors):
-        '''Why did I do this in a single line?'''
-        return tuple(int(sum(percent[status] * colors[status][i] for status, value in percent.items())) for i in range(3))
-
+        mult = sum(percent.values())
+        new_color = [int(sum((percent[status] / mult) * colors[status][i] for status, value in percent.items())) for i in range(3)]
+        alpha = ceil(mult * 255)
+        color_with_alpha = tuple([*new_color, alpha])
+        return color_with_alpha
 
 
 def setup(bot):
