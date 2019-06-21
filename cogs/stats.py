@@ -465,7 +465,6 @@ class Stats(commands.Cog):
         status_percent = {}
         prev_timestamp = data[0]['timestamp']
         prev_day = data[0]['day']
-        first = True
         y = 0
         for d in data:
             if d['day'] != prev_day:
@@ -474,9 +473,6 @@ class Stats(commands.Cog):
             if prev_timestamp != d['timestamp']:
                 x = d['hour']
                 pix[x,y] = self._calculate_color(status_percent, status)
-                if first:
-                    print(status_percent)
-                    first = False
                 prev_timestamp = d['timestamp']
                 status_percent = {}
             status_percent[d['status']] = d['percent']
