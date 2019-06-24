@@ -12,7 +12,7 @@ from math import cos, sin, radians, ceil
 from PIL import Image, ImageOps, ImageDraw, ImageFilter, ImageEnhance, ImageFont
 
 status = {'online':(67, 181, 129),
-          'away':(250, 166, 26),
+          'idle':(250, 166, 26),
           'dnd':(240, 71, 71),
           'offline':(116, 127, 141)}
 discord_neutral = (188,188,188)
@@ -142,17 +142,8 @@ class Stats(commands.Cog):
             ''', target.id)
             async with self.bot.session.get(str(target.avatar_url_as(format='png'))) as r:
                 avydata = BytesIO(await r.read())
-            data = dict()
-            for row in rows:
-                if row['status'] == 'online':
-                    data['online'] = row['sum']
-                elif row['status'] == 'offline':
-                    data['offline'] = row['sum']
-                elif row['status'] == 'idle':
-                    data['away'] = row['sum']
-                elif row['status'] == 'dnd':
-                    data['dnd'] = row['sum']
-            data = await self.bot.loop.run_in_executor(None, self._piestatus, avydata, data)
+            statuses = {row['status'] : row['sum'] for row in rows if row['status'] in status.keys()}
+            data = await self.bot.loop.run_in_executor(None, self._piestatus, avydata, statuses)
             await ctx.send(file=discord.File(data, filename=f'{target.display_name}_pie_status.png'))
     def _piestatus(self, avydata, statuses):
         total = sum(statuses.values())
@@ -187,7 +178,7 @@ class Stats(commands.Cog):
                 piebase.putalpha(mask)
         font = ImageFont.truetype("arial.ttf", 15)
         bx = 310
-        by = {'online':60, 'away':110, 'dnd':160, 'offline':210}
+        by = {'online':60, 'idle':110, 'dnd':160, 'offline':210}
         base.paste(piebase, None, piebase)
         draw = ImageDraw.Draw(base)
         print(total)
@@ -219,17 +210,8 @@ class Stats(commands.Cog):
                 group by status
                 order by sum desc
             ''', target.id)
-            data = dict()
-            for row in rows:
-                if row['status'] == 'online':
-                    data['online'] = row['sum']
-                elif row['status'] == 'offline':
-                    data['offline'] = row['sum']
-                elif row['status'] == 'idle':
-                    data['away'] = row['sum']
-                elif row['status'] == 'dnd':
-                    data['dnd'] = row['sum']
-            data = await self.bot.loop.run_in_executor(None, self._barstatus, f'{target}\'s uptime in the past 30 days', data)
+            statuses = {row['status'] : row['sum'] for row in rows if row['status'] in status.keys()}
+            data = await self.bot.loop.run_in_executor(None, self._barstatus, f'{target}\'s uptime in the past 30 days', statuses)
             await ctx.send(file=discord.File(data, filename=f'{target.display_name}_bar_status.png'))
     def _barstatus(self, title, statuses):
         highest = max(statuses.values())
@@ -237,10 +219,10 @@ class Stats(commands.Cog):
         units = {stat:self.get_significant(value) for stat, value in statuses.items()}
         heights = {stat:(value/highest)*250 for stat, value in statuses.items()}
         box_size = (400,300)
-        rect_x_start = {k:64 + (84 * v) for k, v in {'online':0,'away':1,'dnd':2,'offline':3}.items()}
+        rect_x_start = {k:64 + (84 * v) for k, v in {'online':0,'idle':1,'dnd':2,'offline':3}.items()}
         rect_width = 70
         rect_y_end = 275
-        labels = {'online':'Online', 'away':'Away', 'dnd':'DnD', 'offline':'Offline'}
+        labels = {'online':'Online', 'idle':'Idle', 'dnd':'DnD', 'offline':'Offline'}
         base = Image.new(mode='RGBA', size=box_size, color=(0, 0, 0, 0))
         with Image.open('barstatus_grid1.png') as grid:
             font = ImageFont.truetype("arial.ttf", 12)
@@ -290,7 +272,7 @@ class Stats(commands.Cog):
         query = query_base + '''
             select
                 hour,
-                case when status = 'idle' then 'away' else status end,
+                status,
                 extract(epoch from total) / extract(epoch from max(total) over ()) as percent
             from (
                 select
@@ -371,9 +353,9 @@ class Stats(commands.Cog):
             draw.text((340,draw_y1+16), f'{"+" if tz >= 0 else ""}{tz}', fill=discord_neutral, font=font)
             draw.text((2,2),title, fill=discord_neutral,font=font)
 
-            first = {'online':0,'away':0,'dnd':0,'offline':0}
-            curr = {'online':0,'away':0,'dnd':0,'offline':0}
-            prev = {'online':0,'away':0,'dnd':0,'offline':0}
+            first = {'online':0,'idle':0,'dnd':0,'offline':0}
+            curr = {'online':0,'idle':0,'dnd':0,'offline':0}
+            prev = {'online':0,'idle':0,'dnd':0,'offline':0}
             for d in data:
                 if d['hour'] == 0:
                     first[d['status']] = d['percent']
@@ -393,7 +375,7 @@ class Stats(commands.Cog):
                         draw.line(((x0,y0),(x1,y1)), fill=status[stat], width=1)
                         draw.ellipse(((x1-1,y1-1),(x1+1,y1+1)), fill=status[stat])
                     prev = curr
-                    curr = {'online':0,'away':0,'dnd':0,'offline':0}
+                    curr = {'online':0,'idle':0,'dnd':0,'offline':0}
                     curr[d['status']] = d['percent']
                     hour += 1
                     x += spacing
@@ -422,7 +404,7 @@ class Stats(commands.Cog):
                 s.hours as timestamp,
                 extract(day from s.hours) as day,
                 extract(hour from s.hours) as hour,
-                case when s.status = 'idle' then 'away' else s.status end,
+                s.status,
                 sum(
                     extract(EPOCH from 
                         case 
