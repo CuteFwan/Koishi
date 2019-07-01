@@ -470,7 +470,58 @@ class Stats(commands.Cog):
         buffer.seek(0)
         return buffer
 
+    @commands.command()
+    async def hourlyupdates(self, ctx, target : typing.Optional[discord.Member] = None , tz : int = 0):
+        if tz > 12 or tz < -12:
+            tz = 0
+        tz_delta = datetime.timedelta(hours=tz)
+        target = target or ctx.author
+        query = query_base + '''
+            select
+                s.timestamp,
+                extract(day from s.timestamp) as day,
+                extract(hour from s.timestamp) as hour,
+                count(s.timestamp)
+            from (
+                select
+                    date_trunc('hour', first_seen + $2) as timestamp
+                from status_data
+                where
+                    status in ('offline', 'idle', 'online', 'dnd')
+            ) as s
+            group by timestamp
+            order by timestamp asc
+            '''
+        async with ctx.channel.typing():
+            data = await ctx.bot.pool.fetch(query, target.id, tz_delta)
+            output = await self.bot.loop.run_in_executor(None, self._hourlyupdates, data, tz)
+            await ctx.send(file=discord.File(output, filename='test.png'))
 
+    def _hourlyupdates(self, data, tz):
+        base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
+        pix = base.load()
+        prev_day = data[0]['day']
+        y = 0
+        for d in data:
+            if d['day'] != prev_day:
+                y += 1
+                prev_day = d['day']
+            x = d['hour']
+            amount = min(1, d['count']/30)
+            percents = {'activity' : amount}
+            colors = {'activity' : (67, 181, 129)}
+            pix[x,y] = self._calculate_color(percents, colors)
+
+        base = base.crop((0,0,24,y+1))
+        new_base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
+        new_base.paste(base, box=(0,30-y),mask=base)
+        new_base = new_base.resize((400,new_base.size[1]),Image.NEAREST)
+        new_base = new_base.resize((400,300),Image.NEAREST)
+
+        buffer = BytesIO()
+        new_base.save(buffer, 'png')
+        buffer.seek(0)
+        return buffer
 
     def _calculate_color(self, percent, colors):
         mult = sum(percent.values())
