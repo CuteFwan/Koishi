@@ -508,8 +508,10 @@ class Stats(commands.Cog):
                 prev_day = d['day']
             x = d['hour']
             amount = min(1, d['count']/30)
-            percents = {'activity' : amount}
-            colors = {'activity' : (67, 181, 129)}
+            overload = min(1, max(0, (d['count'] - 30)/30))
+            amount -= overload
+            percents = {'activity' : amount, 'overload' : overload}
+            colors = {'activity' : (67, 181, 129), 'overload' : (255,255,255)}
             pix[x,y] = self._calculate_color(percents, colors)
 
         base = base.crop((0,0,24,y+1))
