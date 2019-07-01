@@ -479,6 +479,25 @@ class Stats(commands.Cog):
         color_with_alpha = tuple([*new_color, alpha])
         return color_with_alpha
 
+    @commands.command()
+    @commands.cooldown(1,7200, commands.BucketType.user)
+    async def getstatusdata(self, ctx, limit : int = 0):
+        async with ctx.channel.typing():
+            buf = BytesIO()
+            query = f'''
+                select
+                    status,
+                    first_seen
+                from statuses
+                where uid=$1
+                order by first_seen desc
+                {f'limit {limit}' if limit > 0 else ''}
+            '''
+            async with self.bot.pool.acquire() as con:
+                await con.copy_from_query(query, ctx.author.id, output=buf, format='csv')
+            buf.seek(0)
+            await ctx.send(file=discord.File(buf, filename=f'{ctx.author.id}_statuses.csv'))
+
 
 def setup(bot):
     bot.add_cog(Stats(bot))
