@@ -525,7 +525,7 @@ class Stats(commands.Cog):
 
     def _calculate_color(self, percent, colors):
         mult = sum(percent.values())
-        new_color = [int(sum((percent[status] / mult) * colors[status][i] for status, value in percent.items())) for i in range(3)]
+        new_color = [int(sum((percent[key] / mult) * colors[key][i] for key, value in percent.items())) for i in range(3)]
         alpha = ceil(mult * 255)
         color_with_alpha = tuple([*new_color, alpha])
         return color_with_alpha
