@@ -2,16 +2,14 @@ from discord.ext import commands
 import discord
 import datetime
 import logging
-import os
 import json
 import asyncio
 import aiohttp
 import asyncpg
-import traceback
 import sys
 
 
-#unnecessary stuff copy pasted in mostly
+# unnecessary stuff copy pasted in mostly
 with open('config.json', 'r') as f:
     config = json.load(f)
 BOT_INVITE = config["BOT_INVITE"]
@@ -24,11 +22,25 @@ AVY_GUILD = config["AVY_GUILD"]
 AVY_CHANNEL = config["AVY_CHANNEL"]
 DEFAULT_PREFIX = config["DEFAULT_PREFIX"]
 
-logger = logging.getLogger('discord')
+logFormatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+
+discordLogger = logging.getLogger('discord')
+discordLogger.setLevel(logging.INFO)
+
+discordFilehandler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+discordFilehandler.setFormatter(logFormatter)
+discordLogger.addHandler(discordFilehandler)
+
+logger = logging.getLogger('koishi')
 logger.setLevel(logging.INFO)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-logger.addHandler(handler)
+
+consoleLogHandler = logging.StreamHandler(sys.stdout)
+consoleLogHandler.setFormatter(logFormatter)
+logger.addHandler(consoleLogHandler)
+
+koishiFilehandler = logging.FileHandler(filename='koishi.log', encoding='utf-8', mode='w')
+koishiFilehandler.setFormatter(logFormatter)
+logger.addHandler(koishiFilehandler)
 
 description = '''Lies and slander follow'''
 bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or(DEFAULT_PREFIX), description=description)
@@ -41,9 +53,10 @@ bot.server_invite = SERVER_INVITE
 
 @bot.event
 async def on_ready():
-    print('Logged in as', bot.user)
-    print('id', bot.user.id)
-    print('Running', discord.__version__)
+    logger.info(f'Logged in as {bot.user}')
+    logger.info(f'id {bot.user.id}')
+    logger.info(f'Running {discord.__version__}')
+
 
 @bot.command(hidden=True)
 @commands.is_owner()
@@ -54,8 +67,9 @@ async def backupreload(ctx, extension_name: str):
     except (AttributeError, ImportError) as e:
         await ctx.send("```py\n{}: {}\n```".format(type(e).__name__, str(e)))
         return
-    print("{} reloaded.".format(extension_name))
+    logger.info(f'{extension_name} reloaded.')
     await ctx.send("{} reloaded.".format(extension_name))
+
 
 @bot.command(hidden=True)
 @commands.is_owner()
@@ -63,11 +77,13 @@ async def logout(ctx):
     await ctx.send('goodbye')
     await bot.logout()
 
+
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
     await bot.process_commands(message)
+
 
 async def create_pool(uri, **kwargs):
     """
@@ -77,9 +93,9 @@ async def create_pool(uri, **kwargs):
         if isinstance(data, datetime.datetime):
             return data.__str__()
 
-
     def _encode_jsonb(data):
         return json.dumps(data, default=converter)
+
     def _decode_jsonb(data):
         return json.loads(data)
 
@@ -90,14 +106,14 @@ async def create_pool(uri, **kwargs):
         if extra_init is not None:
             await extra_init(conn)
     return await asyncpg.create_pool(uri, init=init, **kwargs)
-    
+
+
 async def run():
     try:
         pool = await create_pool(DB_URI)
-        print('Connected to postgresql server')
+        logger.info('Connected to postgresql server')
     except Exception as e:
-        print('Could not set up postgresql')
-        traceback.print_exc()
+        logger.exception('Could not set up postgresql')
         return
     bot.session = aiohttp.ClientSession()
     bot.pool = pool
@@ -115,7 +131,6 @@ if __name__ == "__main__":
         try:
             bot.load_extension(extension)
         except Exception as e:
-            print(f'Failed to load extension {extension}.', file=sys.stderr)
-            traceback.print_exc()
+            logger.exception(f'Failed to load extension {extension}.')
     loop = asyncio.get_event_loop()
     loop.run_until_complete(run())
