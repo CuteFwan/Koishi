@@ -69,6 +69,7 @@ scheme2 = {
             }
          }
 
+
 class Pop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -84,17 +85,17 @@ class Pop(commands.Cog):
         self.logger = logging.getLogger('koishi')
 
     def cog_unload(self):
-        logging.info('die')
+        self.logger.info('die')
         utcnow = datetime.datetime.utcnow()
         self.post_avy_task.cancel()
         self.dl_avys_task.cancel()
         for recordtype, task in self.bg_tasks.items():
-            logging.info(f'canceling {recordtype}')
+            self.logger.info(f'canceling {recordtype}')
             task.cancel()
         self.fill_updates(0, 0, 'cog_offline', utcnow, True)
 
     async def batching_task(self, recordtype, interval : int = 5):
-        logging.info(f'started {recordtype} task')
+        self.logger.info(f'started {recordtype} task')
         try:
             interval = min(max(1,interval),60)
             await self.bot.wait_until_ready()
@@ -102,11 +103,11 @@ class Pop(commands.Cog):
                 await asyncio.sleep(interval)
                 await self.insert_to_db(recordtype)
         except asyncio.CancelledError:
-            logging.warning(f'Batching task for {recordtype} was cancelled')
+            self.logger.warning(f'Batching task for {recordtype} was cancelled')
             await self.insert_to_db(recordtype)
             if self.pending_updates[recordtype]:
-                logging.error(f'{len(self.pending_updates[recordtype])} status updates DIED')
-        logging.info(f'exited {recordtype} task')
+                self.logger.error(f'{len(self.pending_updates[recordtype])} status updates DIED')
+        self.logger.info(f'exited {recordtype} task')
 
     async def insert_to_db(self, recordtype):
         to_insert = self.pending_updates[recordtype]
@@ -157,7 +158,8 @@ class Pop(commands.Cog):
         await self.bot.pool.execute(query, transformed)
 
     async def dl_avys(self):
-        logging.info('started avatar downloading task')
+        self.logger.info('started avatar downloading task')
+
         async def url_to_bytes(hash, url):
             try:
                 async with self.bot.session.get(str(url)) as r:
@@ -193,18 +195,20 @@ class Pop(commands.Cog):
                     await asyncio.gather(*[url_to_bytes(avy, url) for avy, url in chunk.items()])
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
-            logging.warning('avatar downloading task canceled')
-
+            self.logger.warning('avatar downloading task canceled')
 
     async def batch_post_avatars(self):
-        logging.info('started avatar posting task')
+        self.logger.info('started avatar posting task')
         try:
             await self.bot.wait_until_ready()
             while True:
                 while not self.wh:
-                    self.wh = discord.utils.get(await self.bot.get_guild(self.bot.avy_guild).webhooks(), channel_id=self.bot.avy_channel)
+                    self.wh = discord.utils.get(
+                        await self.bot.get_guild(self.bot.avy_guild).webhooks(),
+                        channel_id=self.bot.avy_channel
+                    )
                     if self.wh:
-                        logging.info(f'found webhook {self.wh.name} for {self.bot.avy_channel}')
+                        self.logger.info(f'found webhook {self.wh.name} for {self.bot.avy_channel}')
                         break
                     else:
                         await asyncio.sleep(2)
@@ -233,11 +237,11 @@ class Pop(commands.Cog):
                 if len(to_post) == 0:
                     continue
 
-                backup = {k : BytesIO(v.fp.getbuffer()) for k, v in to_post.items()}
+                backup = {k: BytesIO(v.fp.getbuffer()) for k, v in to_post.items()}
 
                 for tries in range(5):
                     if tries > 0:
-                        to_post = {k : discord.File(BytesIO(v.getbuffer()), filename=f'{k}.{"png" if not k.startswith("a_") else "gif"}') for k, v in backup.items()}
+                        to_post = {k: discord.File(BytesIO(v.getbuffer()), filename=f'{k}.{"png" if not k.startswith("a_") else "gif"}') for k, v in backup.items()}
                     try:
                         message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
                         transformed = []
@@ -266,17 +270,17 @@ class Pop(commands.Cog):
                         await self.bot.pool.execute(query, transformed)
                         if len(backup) == 0:
                             break
-                        logging.warning(f'{len(backup)} failed to upload. retrying')
+                        self.logger.warning(f'{len(backup)} failed to upload. retrying')
                     except discord.HTTPException:
-                        logging.exception('something happened')
+                        self.logger.exception('something happened')
                     except aiohttp.ClientError:
-                        logging.exception('discord big gay')
+                        self.logger.exception('discord big gay')
                     except ValueError:
-                        logging.exception('for some reason the file is closed')
+                        self.logger.exception('for some reason the file is closed')
                     await asyncio.sleep(2 + 2 * tries)
 
         except asyncio.CancelledError:
-            logging.warning('Batching task for avatar posting was cancelled')
+            self.logger.warning('Batching task for avatar posting was cancelled')
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -288,12 +292,12 @@ class Pop(commands.Cog):
             self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
             self.synced.set()
             self.first_synced = True
-            logging.info("synced!")
+            self.logger.info("synced!")
 
     def add_bulk_members(self, members, utcnow):
         for m in members:
             self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
-        logging.info(f'Added members in bulk: {len(list(set(members)))}')
+        self.logger.info(f'Added members in bulk: {len(list(set(members)))}')
         for m in list(set(members)):
             self.pending_updates['names'].append((m.id, m.name, utcnow))
             self.pending_updates['avatars'].append((
@@ -324,7 +328,7 @@ class Pop(commands.Cog):
             self.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
     def fill_updates(self, uid, sid, msg, utcnow, full = True):
-        logging.info(f'running fill_updates with {full}')
+        self.logger.info(f'running fill_updates with {full}')
         self.pending_updates['nicks'].append((uid, sid, msg, utcnow))
         if full:
             self.pending_updates['names'].append((uid, msg, utcnow))
@@ -393,7 +397,7 @@ class Pop(commands.Cog):
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
         self.add_bulk_members(guild.members, utcnow)
-        logging.info(f'Added {guild.member_count} people to queues!')
+        self.logger.info(f'Added {guild.member_count} people to queues!')
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
@@ -410,8 +414,5 @@ class Pop(commands.Cog):
                 self.fill_updates(member.id, member.guild.id, 'left_guild', utcnow, False)
 
 
-                
-
-    
 def setup(bot):
     bot.add_cog(Pop(bot))

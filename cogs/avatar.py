@@ -27,7 +27,6 @@ class Avatar(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-
     @commands.command()
     async def avyquilt(self, ctx, member : discord.Member = None):
         member = member or ctx.author
@@ -103,6 +102,5 @@ class Avatar(commands.Cog):
             return buffer
 
 
-    
 def setup(bot):
     bot.add_cog(Avatar(bot))
