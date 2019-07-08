@@ -278,6 +278,8 @@ class Pop(commands.Cog):
                         print('discord big gay')
                     except ValueError:
                         print('for some reason the file is closed')
+                    except TypeError:
+                        print('for some reason discord api returned something empty')
                     await asyncio.sleep(2 + 2 * tries)
 
 
