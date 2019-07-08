@@ -450,7 +450,7 @@ class Stats(commands.Cog):
         y = 0
         for d in data:
             if d['day'] != prev_day:
-                y += 1
+                y += (d['timestamp'].date() - prev_timestamp.date()).days
                 prev_day = d['day']
             if prev_timestamp != d['timestamp']:
                 x = d['hour']
@@ -504,7 +504,7 @@ class Stats(commands.Cog):
         y = 0
         for d in data:
             if d['day'] != prev_day:
-                y += 1
+                y += (d['timestamp'].date() - prev_timestamp.date()).days
                 prev_day = d['day']
             x = d['hour']
             amount = min(1, d['count']/30)
