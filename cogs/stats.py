@@ -452,7 +452,7 @@ class Stats(commands.Cog):
         y = 0
         for d in data:
             if d['day'] != prev_day:
-                y += 1
+                y += (d['timestamp'].date() - prev_timestamp.date()).days
                 prev_day = d['day']
             if prev_timestamp != d['timestamp']:
                 x = d['hour']
@@ -502,11 +502,13 @@ class Stats(commands.Cog):
     def _hourlyupdates(self, data, tz):
         base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
         pix = base.load()
+        prev_timestamp = data[0]['timestamp']
         prev_day = data[0]['day']
         y = 0
         for d in data:
             if d['day'] != prev_day:
-                y += 1
+                y += (d['timestamp'].date() - prev_timestamp.date()).days
+                prev_timestamp = d['timestamp']
                 prev_day = d['day']
             x = d['hour']
             amount = min(1, d['count']/30)

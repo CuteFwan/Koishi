@@ -243,7 +243,7 @@ class Pop(commands.Cog):
                     if tries > 0:
                         to_post = {k: discord.File(BytesIO(v.getbuffer()), filename=f'{k}.{"png" if not k.startswith("a_") else "gif"}') for k, v in backup.items()}
                     try:
-                        message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=to_post.values())
+                        message = await self.wh.send(content='\n'.join(to_post.keys()), wait=True, files=list(to_post.values()))
                         transformed = []
                         for a in message.attachments:
                             if a.height:
@@ -277,6 +277,9 @@ class Pop(commands.Cog):
                         self.logger.exception('discord big gay')
                     except ValueError:
                         self.logger.exception('for some reason the file is closed')
+                        print('for some reason the file is closed')
+                    except TypeError:
+                        self.logger.exception('for some reason discord api returned something empty')
                     await asyncio.sleep(2 + 2 * tries)
 
         except asyncio.CancelledError:
