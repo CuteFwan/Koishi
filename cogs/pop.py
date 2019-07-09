@@ -277,7 +277,6 @@ class Pop(commands.Cog):
                         self.logger.exception('discord big gay')
                     except ValueError:
                         self.logger.exception('for some reason the file is closed')
-                        print('for some reason the file is closed')
                     except TypeError:
                         self.logger.exception('for some reason discord api returned something empty')
                     await asyncio.sleep(2 + 2 * tries)
