@@ -5,3 +5,5 @@
 *.sublime-project
 *.sublime-workspace
 avatars
+*.iml
+.idea

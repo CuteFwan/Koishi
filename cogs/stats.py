@@ -4,12 +4,10 @@ import time
 import datetime
 from io import BytesIO
 from .utils import pretty
-import asyncio
-import aiohttp
-import json
 import typing
 from math import cos, sin, radians, ceil
 from PIL import Image, ImageOps, ImageDraw, ImageFilter, ImageEnhance, ImageFont
+import logging
 
 status = {'online':(67, 181, 129),
           'idle':(250, 166, 26),
@@ -57,9 +55,11 @@ with status_data as(
 )
 '''
 
+
 class Stats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.logger = logging.getLogger("koishi")
         
     @commands.command()
     async def useruptime(self, ctx, *, target : discord.Member = None):
@@ -119,7 +119,6 @@ class Stats(commands.Cog):
                     msg2 = f'Last **offline** {time} ago.'
                 else:
                     msg2 = 'Has not been seen offline in the last 30 days as far as I can tell...'
-
             
         await ctx.send(f'{msg}\n{msg2}')
 
@@ -145,6 +144,7 @@ class Stats(commands.Cog):
             statuses = {row['status'] : row['sum'] for row in rows if row['status'] in status.keys()}
             data = await self.bot.loop.run_in_executor(None, self._piestatus, avydata, statuses)
             await ctx.send(file=discord.File(data, filename=f'{target.display_name}_pie_status.png'))
+
     def _piestatus(self, avydata, statuses):
         total = sum(statuses.values())
         stat_deg = {k:(v/total)*360 for k, v in statuses.items()}
@@ -181,17 +181,16 @@ class Stats(commands.Cog):
         by = {'online':60, 'idle':110, 'dnd':160, 'offline':210}
         base.paste(piebase, None, piebase)
         draw = ImageDraw.Draw(base)
-        print(total)
+        self.logger.debug(f'total statuses: {total}')
         for k, v in statuses.items():
             draw.rectangle(((bx, by[k]),(bx+30, by[k]+30)), fill=status[k], outline=(255,255,255,255))
             draw.text((bx+40, by[k]+8), f'{(v/total)*100:.2f}%', fill=discord_neutral, font=font)
-            print(f'{(v/total)*100:.2f}%')
+            self.logger.debug(f'{(v/total)*100:.2f}%')
         del draw
         buffer = BytesIO()
         base.save(buffer, 'png')
         buffer.seek(0)
         return buffer
-
 
     @commands.command()
     async def barstatus(self, ctx, *, target : discord.Member = None):
@@ -213,6 +212,7 @@ class Stats(commands.Cog):
             statuses = {row['status'] : row['sum'] for row in rows if row['status'] in status.keys()}
             data = await self.bot.loop.run_in_executor(None, self._barstatus, f'{target}\'s uptime in the past 30 days', statuses)
             await ctx.send(file=discord.File(data, filename=f'{target.display_name}_bar_status.png'))
+
     def _barstatus(self, title, statuses):
         highest = max(statuses.values())
         highest_unit = self.get_significant(highest)
@@ -243,6 +243,7 @@ class Stats(commands.Cog):
         base.save(buffer, 'png')
         buffer.seek(0)
         return buffer
+
     def get_significant(self, stat):
         word = ''
         if stat >= 604800:
@@ -441,6 +442,7 @@ class Stats(commands.Cog):
             data = await ctx.bot.pool.fetch(query, target.id, tz_delta)
             output = await self.bot.loop.run_in_executor(None, self._calendarstatus, data, tz)
             await ctx.send(file=discord.File(output, filename='test.png'))
+
     def _calendarstatus(self, data, tz):
         base = Image.new(mode='RGBA', size=(24, 31), color=(0, 0, 0, 0))
         pix = base.load()
