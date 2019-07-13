@@ -95,7 +95,7 @@ class Pop(commands.Cog):
             task.cancel()
         self.bot.loop.create_task(self.cog_log(False, utcnow))
 
-    async def cog_log(self, start=True, time):
+    async def cog_log(self, start, time):
         event = 'cog_online' if start else 'cog_offline'
         query = '''insert into cog_log (event, time) values ($1, $2)'''
         await self.bot.pool.execute(query, event, time)
