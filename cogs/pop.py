@@ -17,7 +17,6 @@ scheme = {
          'avatars' : {
             'uid' : 'BIGINT',
             'avatar' : 'TEXT',
-            'avatar_url' : 'TEXT',
             'first_seen' : 'TIMESTAMP WITHOUT TIME ZONE'
             },
          'discrims' : {
@@ -305,7 +304,6 @@ class Pop(commands.Cog):
             self.pending_updates['avatars'].append((
                                                     m.id,
                                                     m.avatar if m.avatar else m.default_avatar.name,
-                                                    str(m.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
@@ -321,7 +319,6 @@ class Pop(commands.Cog):
             self.pending_updates['avatars'].append((
                                                     m.id,
                                                     m.avatar if m.avatar else m.default_avatar.name,
-                                                    str(m.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
             self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
@@ -334,7 +331,7 @@ class Pop(commands.Cog):
         self.pending_updates['nicks'].append((uid, sid, msg, utcnow))
         if full:
             self.pending_updates['names'].append((uid, msg, utcnow))
-            self.pending_updates['avatars'].append((uid, msg, msg, utcnow))
+            self.pending_updates['avatars'].append((uid, msg, utcnow))
             self.pending_updates['discrims'].append((uid, msg, utcnow))
             self.pending_updates['statuses'].append((uid, msg, utcnow))
             self.pending_updates['games'].append((uid, msg, utcnow))
@@ -366,7 +363,6 @@ class Pop(commands.Cog):
             self.pending_updates['avatars'].append((
                                                     aid,
                                                     after.avatar if after.avatar else after.default_avatar.name,
-                                                    str(after.avatar_url_as(static_format='png')),
                                                     utcnow
                                                   ))
             self.avy_urls[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
