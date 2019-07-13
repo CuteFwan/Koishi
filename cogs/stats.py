@@ -36,14 +36,19 @@ with status_data as(
             status,
             lag(status) over (order by first_seen desc) as status_last
         from ( 
-            (select event, time
-            from cog_log
-            order by time desc)
+            (select status, first_seen
+            from statuses
+            where uid=0
+            order by first_seen desc)
             union
-            (select 'guild_leave', time
+            (select event as status, time as first_seen
+            from cog_log
+            order by first_seen desc)
+            union
+            (select 'guild_leave' as status, time as first_seen
             from member_removes
             where uid=$1
-            order by time desc)
+            order by first_seen desc)
             union
             (select status, first_seen
             from statuses

@@ -73,6 +73,7 @@ class Pop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.pending_updates = {recordtype : [] for recordtype in scheme.keys()}
+        self.pending_removes = []
         self.avy_urls = dict()
         self.avy_posting_queue = asyncio.Queue(maxsize = 50)
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
@@ -360,7 +361,7 @@ class Pop(commands.Cog):
         query = f'''
                 insert into member_removes (uid, time)
                 select uid, time
-                from jsonb_to_recordset($1::jsonb) as x(uid TEXT, time TIMESTAMP WITHOUT TIME ZONE)
+                from jsonb_to_recordset($1::jsonb) as x(uid BIGINT, time TIMESTAMP WITHOUT TIME ZONE)
                 '''
         await self.bot.pool.execute(query, transformed)
 
