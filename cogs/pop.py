@@ -78,6 +78,7 @@ class Pop(commands.Cog):
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
         self.post_avy_task = self.bot.loop.create_task(self.batch_post_avatars())
         self.dl_avys_task = self.bot.loop.create_task(self.dl_avys())
+        self.batch_remove_task = self.bot.loop.create_task(self.batch_member_remove())
         self.synced = asyncio.Event()
         self.wh = None
         self.first_synced = False
@@ -88,10 +89,16 @@ class Pop(commands.Cog):
         utcnow = datetime.datetime.utcnow()
         self.post_avy_task.cancel()
         self.dl_avys_task.cancel()
+        self.batch_remove_task.cancel()
         for recordtype, task in self.bg_tasks.items():
             self.logger.info(f'canceling {recordtype}')
             task.cancel()
-        self.fill_updates(0, 0, 'cog_offline', utcnow, True)
+        self.bot.loop.create_task(self.cog_log(False, utcnow))
+
+    async def cog_log(self, start=True, time):
+        event = 'cog_online' if start else 'cog_offline'
+        query = '''insert into cog_log (event, time) values ($1, $2)'''
+        await self.bot.pool.execute(query, event, time)
 
     async def batching_task(self, recordtype, interval : int = 5):
         self.logger.info(f'started {recordtype} task')
@@ -109,7 +116,7 @@ class Pop(commands.Cog):
         self.logger.info(f'exited {recordtype} task')
 
     async def insert_to_db(self, recordtype):
-        to_insert = self.pending_updates[recordtype]
+        to_insert = self.pending_updates[recordtype][:]
         if len(to_insert) == 0:
             return
         self.pending_updates[recordtype] = []
@@ -141,7 +148,7 @@ class Pop(commands.Cog):
                 await con.execute(query)
 
     async def insert_to_db_2(self, recordtype):
-        to_insert = self.pending_updates[recordtype]
+        to_insert = self.pending_updates[recordtype][:]
         if len(to_insert) == 0:
             return
         self.pending_updates[recordtype] = []
@@ -289,7 +296,7 @@ class Pop(commands.Cog):
             utcnow = datetime.datetime.utcnow()
 
             await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
-            self.fill_updates(0, 0, 'cog_online', utcnow - datetime.timedelta(microseconds=1), True)
+            await self.cog_log(True, utcnow - datetime.timedelta(microseconds=1))
             self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
             self.synced.set()
             self.first_synced = True
@@ -330,11 +337,32 @@ class Pop(commands.Cog):
         self.logger.info(f'running fill_updates with {full}')
         self.pending_updates['nicks'].append((uid, sid, msg, utcnow))
         if full:
-            self.pending_updates['names'].append((uid, msg, utcnow))
-            self.pending_updates['avatars'].append((uid, msg, utcnow))
-            self.pending_updates['discrims'].append((uid, msg, utcnow))
-            self.pending_updates['statuses'].append((uid, msg, utcnow))
-            self.pending_updates['games'].append((uid, msg, utcnow))
+            self.pending_removes.append((uid, utcnow))
+
+    async def batch_member_remove(self):
+        self.logger.info('started batch member remove task')
+        try:
+            await self.bot.wait_until_ready()
+            while True:
+                await asyncio.sleep(5)
+                await self.insert_member_removes()
+        except asyncio.CancelledError:
+            self.logger.warning('task for batch member remove was cancelled')
+            await self.insert_member_removes()
+        self.logger.info('exited batch member remove task')
+
+    async def insert_member_removes(self):
+        to_insert = self.pending_removes[:]
+        if len(to_insert) == 0:
+            return
+        self.pending_removes = []
+        transformed = [{'uid' : row[0], 'time' : row[1]} for row in to_insert]
+        query = f'''
+                insert into member_removes (uid, time)
+                select uid, time
+                from jsonb_to_recordset($1::jsonb) as x(uid TEXT, time TIMESTAMP WITHOUT TIME ZONE)
+                '''
+        await self.bot.pool.execute(query, transformed)
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
