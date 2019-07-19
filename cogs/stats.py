@@ -77,7 +77,7 @@ class Stats(commands.Cog):
         
         result = await ctx.bot.pool.fetchval('''
             SELECT keep
-            FROM user_options
+            FROM presence_whitelist
             WHERE uid=$1''', ctx.author.id)
         await ctx.send(f"Currently I am {'not' if not result} storing your presence updates beyond 30 days. Would you like to change that? (y/n)")
 
@@ -86,9 +86,19 @@ class Stats(commands.Cog):
 
         answer = await ctx.bot.wait_for("message", check=check)
         if answer.content.lower() in ["y", "yes"]:
+            await ctx.pool.execute('''
+                INSERT INTO presence_whitelist
+                (uid, keep)
+                VALUES
+                ($1, $2)
+                ON CONFLICT uid
+                DO UPDATE
+                SET keep = NOT keep''')
             await ctx.send("Changed.")
         else:
             await ctx.send("Ok.")
+
+
 
 
 
