@@ -71,6 +71,11 @@ class Stats(commands.Cog):
         self.logger = logging.getLogger("koishi")
         
     @commands.command()
+    async def toggle_purge(self, ctx):
+        '''Toggles whether or not to purge or save presence updates beyond 30 days. Not implemented yet.'''
+
+
+    @commands.command()
     async def useruptime(self, ctx, *, target : discord.Member = None):
         target = target or ctx.author
         if target.id == self.bot.user.id:
