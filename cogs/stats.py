@@ -72,8 +72,8 @@ class Stats(commands.Cog):
         
     @commands.command()
     async def toggle_purge(self, ctx):
-        '''Toggles whether or not to purge or save presence updates beyond 30 days. Not implemented yet.'''
-
+        '''Toggles whether or not to purge or save presence updates beyond 30 days.'''
+        await ctx.send("Not implemented yet.")
 
     @commands.command()
     async def useruptime(self, ctx, *, target : discord.Member = None):
