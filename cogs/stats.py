@@ -45,7 +45,7 @@ with status_data as(
             from cog_log
             order by first_seen desc)
             union
-            (select 'guild_leave' as status, time as first_seen
+            (select 'left_guild' as status, time as first_seen
             from member_removes
             where uid=$1
             order by first_seen desc)
