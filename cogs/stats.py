@@ -79,7 +79,7 @@ class Stats(commands.Cog):
             SELECT keep
             FROM presence_whitelist
             WHERE uid=$1''', ctx.author.id)
-        await ctx.send(f"Currently I am {'not' if not result} storing your presence updates beyond 30 days. Would you like to change that? (y/n)")
+        await ctx.send(f"Currently I am {'not' if not result else ''} storing your presence updates beyond 30 days. Would you like to change that? (y/n)")
 
         def check(m):
             return m.channel.id == ctx.channel.id and m.author.id == ctx.author.id and m.content.lower() in ["y", "yes", "n", "no"]
