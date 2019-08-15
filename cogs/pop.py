@@ -171,12 +171,19 @@ class Pop(commands.Cog):
                 async with self.bot.session.get(str(url)) as r:
                     if r.status == 200:
                         await self.bot.avy_posting_queue.put((hash, BytesIO(await r.read())))
-                    elif r.status in [403, 404]:
                         return
+                    if r.status in [403, 404]:
+                        # Discord has forsaken us. Mostly likely invalid url.
+                        pass
+                    elif r.status == 415:
+                        # Discord is bad
+                        pass
                     else:
-                        # unsuccessful, put it back in for next round
+                        # unsuccessful, put it back in for next round.
                         self.bot.avy_urls[hash] = url
+                    self.logger.info(f'downloading {url} failed with {r.status}')
             except (asyncio.TimeoutError, aiohttp.ClientError):
+                self.logger.exception(f'downloading {url} failed.')
                 self.bot.avy_urls[hash] = url
         try:
             await self.bot.wait_until_ready()
