@@ -7,6 +7,7 @@ import asyncio
 from .utils import images
 from io import BytesIO
 import logging
+from yarl import URL
 
 scheme = {
          'names' : {
@@ -176,8 +177,15 @@ class Pop(commands.Cog):
                         # Discord has forsaken us. Mostly likely invalid url.
                         pass
                     elif r.status == 415:
-                        # Discord is bad
-                        pass
+                        # Discord is bad. retry with lower size.
+                        url = URL(str(url))
+                        new_size = int(url.query.get('size', 1024))//2
+                        if new_size > 128:
+                            # give up resizing it. Its too small to be worthwhile.
+                            new_url = url.with_query(size=str(new_size))
+                        else:
+                            new_url = url.with_path(url.path.replace('gif','png')).with_query(size=1024)
+                        self.bot.avy_urls[hash] = new_url
                     else:
                         # unsuccessful, put it back in for next round.
                         self.bot.avy_urls[hash] = url
