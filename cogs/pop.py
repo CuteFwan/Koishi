@@ -172,6 +172,8 @@ class Pop(commands.Cog):
                 async with self.bot.session.get(str(url)) as r:
                     if r.status == 200:
                         await self.avy_posting_queue.put((hash, BytesIO(await r.read())))
+                    elif r.status in [403, 404]:
+                        return
                     else:
                         # unsuccessful, put it back in for next round
                         self.avy_urls[hash] = url
