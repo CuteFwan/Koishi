@@ -72,10 +72,6 @@ scheme2 = {
 class Pop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.pending_updates = {recordtype : [] for recordtype in scheme.keys()}
-        self.pending_removes = []
-        self.avy_urls = dict()
-        self.avy_posting_queue = asyncio.Queue(maxsize = 50)
         self.bg_tasks = {recordtype : self.bot.loop.create_task(self.batching_task(recordtype)) for recordtype in scheme.keys()}
         self.post_avy_task = self.bot.loop.create_task(self.batch_post_avatars())
         self.dl_avys_task = self.bot.loop.create_task(self.dl_avys())
@@ -112,15 +108,15 @@ class Pop(commands.Cog):
         except asyncio.CancelledError:
             self.logger.warning(f'Batching task for {recordtype} was cancelled')
             await self.insert_to_db(recordtype)
-            if self.pending_updates[recordtype]:
-                self.logger.error(f'{len(self.pending_updates[recordtype])} status updates DIED')
+            if self.bot.pending_updates[recordtype]:
+                self.logger.error(f'{len(self.bot.pending_updates[recordtype])} status updates DIED')
         self.logger.info(f'exited {recordtype} task')
 
     async def insert_to_db(self, recordtype):
-        to_insert = self.pending_updates[recordtype][:]
+        to_insert = self.bot.pending_updates[recordtype][:]
         if len(to_insert) == 0:
             return
-        self.pending_updates[recordtype] = []
+        self.bot.pending_updates[recordtype] = []
         async with self.bot.pool.acquire() as con:
             result = await con.copy_records_to_table(recordtype, records=to_insert, columns=scheme[recordtype].keys(),schema_name='koi_test')
             if len(to_insert) > 20000 and recordtype not in ['statuses','games']:
@@ -149,10 +145,10 @@ class Pop(commands.Cog):
                 await con.execute(query)
 
     async def insert_to_db_2(self, recordtype):
-        to_insert = self.pending_updates[recordtype][:]
+        to_insert = self.bot.pending_updates[recordtype][:]
         if len(to_insert) == 0:
             return
-        self.pending_updates[recordtype] = []
+        self.bot.pending_updates[recordtype] = []
         names = scheme[recordtype].keys()
         cols = ', '.join(names)
         types = ', '.join(f'{k} {v}' for k, v in scheme[recordtype].items())
@@ -171,18 +167,18 @@ class Pop(commands.Cog):
             try:
                 async with self.bot.session.get(str(url)) as r:
                     if r.status == 200:
-                        await self.avy_posting_queue.put((hash, BytesIO(await r.read())))
+                        await self.bot.avy_posting_queue.put((hash, BytesIO(await r.read())))
                     elif r.status in [403, 404]:
                         return
                     else:
                         # unsuccessful, put it back in for next round
-                        self.avy_urls[hash] = url
+                        self.bot.avy_urls[hash] = url
             except (asyncio.TimeoutError, aiohttp.ClientError):
-                self.avy_urls[hash] = url
+                self.bot.avy_urls[hash] = url
         try:
             await self.bot.wait_until_ready()
             while True:
-                while len(self.avy_urls) == 0:
+                while len(self.bot.avy_urls) == 0:
                     await asyncio.sleep(2)
                 query = '''
                     select hash
@@ -190,15 +186,15 @@ class Pop(commands.Cog):
                     where
                         hash = any($1::text[])
                 '''
-                results = await self.bot.pool.fetch(query, self.avy_urls.keys())
+                results = await self.bot.pool.fetch(query, self.bot.avy_urls.keys())
                 for r in results:
                     # remove items in the avatar url dict that are already in the db
-                    self.avy_urls.pop(r['hash'], None)
+                    self.bot.avy_urls.pop(r['hash'], None)
 
                 chunk = dict()
-                while len(self.avy_urls) > 0 and len(chunk) < (50 - self.avy_posting_queue.qsize()):
+                while len(self.bot.avy_urls) > 0 and len(chunk) < (50 - self.bot.avy_posting_queue.qsize()):
                     # grabs enough avatars to fill the posting queue with 50 avatars if possible
-                    avy, url = self.avy_urls.popitem()
+                    avy, url = self.bot.avy_urls.popitem()
                     chunk[avy] = url
                 if chunk:
                     await asyncio.gather(*[url_to_bytes(avy, url) for avy, url in chunk.items()])
@@ -221,13 +217,13 @@ class Pop(commands.Cog):
                         break
                     else:
                         await asyncio.sleep(2)
-                if self.avy_posting_queue.qsize() == 0:
+                if self.bot.avy_posting_queue.qsize() == 0:
                     await asyncio.sleep(2)
 
                 to_post = {}
                 post_size = 0
-                while len(to_post) < 10 and self.avy_posting_queue.qsize() > 0:
-                    avy, file = await self.avy_posting_queue.get()
+                while len(to_post) < 10 and self.bot.avy_posting_queue.qsize() > 0:
+                    avy, file = await self.bot.avy_posting_queue.get()
                     s = file.getbuffer().nbytes
                     if post_size + s < 8000000:
                         post_size += s
@@ -238,10 +234,10 @@ class Pop(commands.Cog):
                             new_bytes = await self.bot.loop.run_in_executor(None, images.extract_first_frame, file)
                         else:
                             new_bytes = await self.bot.loop.run_in_executor(None, images.resize_to_limit, file, 8000000)
-                        await self.avy_posting_queue.put((avy, new_bytes))
+                        await self.bot.avy_posting_queue.put((avy, new_bytes))
                         continue
                     else:
-                        await self.avy_posting_queue.put((avy, file))
+                        await self.bot.avy_posting_queue.put((avy, file))
                         break
                 if len(to_post) == 0:
                     continue
@@ -307,40 +303,40 @@ class Pop(commands.Cog):
 
     def add_bulk_members(self, members, utcnow):
         for m in members:
-            self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
+            self.bot.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
         self.logger.info(f'Added members in bulk: {len(list(set(members)))}')
         for m in list(set(members)):
-            self.pending_updates['names'].append((m.id, m.name, utcnow))
-            self.pending_updates['avatars'].append((
+            self.bot.pending_updates['names'].append((m.id, m.name, utcnow))
+            self.bot.pending_updates['avatars'].append((
                                                     m.id,
                                                     m.avatar if m.avatar else m.default_avatar.name,
                                                     utcnow
                                                   ))
-            self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
-            self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
-            self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-            self.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
+            self.bot.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
+            self.bot.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
+            self.bot.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
+            self.bot.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
 
     def add_member(self, m, utcnow, full = True):
-        self.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
+        self.bot.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
         if full:
-            self.pending_updates['names'].append((m.id, m.name, utcnow))
-            self.pending_updates['avatars'].append((
+            self.bot.pending_updates['names'].append((m.id, m.name, utcnow))
+            self.bot.pending_updates['avatars'].append((
                                                     m.id,
                                                     m.avatar if m.avatar else m.default_avatar.name,
                                                     utcnow
                                                   ))
-            self.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
-            self.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
-            self.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
-            self.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
+            self.bot.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
+            self.bot.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
+            self.bot.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
+            self.bot.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
     def fill_updates(self, uid, sid, msg, utcnow, full = True):
         self.logger.info(f'running fill_updates with {full}')
-        self.pending_updates['nicks'].append((uid, sid, msg, utcnow))
+        self.bot.pending_updates['nicks'].append((uid, sid, msg, utcnow))
         if full:
-            self.pending_removes.append((uid, utcnow))
+            self.bot.pending_removes.append((uid, utcnow))
 
     async def batch_member_remove(self):
         self.logger.info('started batch member remove task')
@@ -355,10 +351,10 @@ class Pop(commands.Cog):
         self.logger.info('exited batch member remove task')
 
     async def insert_member_removes(self):
-        to_insert = self.pending_removes[:]
+        to_insert = self.bot.pending_removes[:]
         if len(to_insert) == 0:
             return
-        self.pending_removes = []
+        self.bot.pending_removes = []
         transformed = [{'uid' : row[0], 'time' : row[1]} for row in to_insert]
         query = f'''
                 insert into member_removes (uid, time)
@@ -389,16 +385,16 @@ class Pop(commands.Cog):
         aid = after.id
 
         if before.name != after.name:
-            self.pending_updates['names'].append((aid, after.name, utcnow))
+            self.bot.pending_updates['names'].append((aid, after.name, utcnow))
         if before.avatar != after.avatar:
-            self.pending_updates['avatars'].append((
+            self.bot.pending_updates['avatars'].append((
                                                     aid,
                                                     after.avatar if after.avatar else after.default_avatar.name,
                                                     utcnow
                                                   ))
-            self.avy_urls[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
+            self.bot.avy_urls[after.avatar if after.avatar else after.default_avatar.name] = str(after.avatar_url_as(static_format='png'))
         if before.discriminator != after.discriminator:
-            self.pending_updates['discrims'].append((aid, after.discriminator, utcnow))
+            self.bot.pending_updates['discrims'].append((aid, after.discriminator, utcnow))
 
     @commands.Cog.listener()
     async def on_member_update(self, before, after):
@@ -407,15 +403,15 @@ class Pop(commands.Cog):
         aid = after.id
 
         if before.nick != after.nick:
-            self.pending_updates['nicks'].append((aid, after.guild.id, after.nick, utcnow))
+            self.bot.pending_updates['nicks'].append((aid, after.guild.id, after.nick, utcnow))
 
         lowest = discord.utils.find(lambda x: x.get_member(aid) is not None, sorted(self.bot.guilds, key=lambda x: x.id)) # stolen from luma I think
         
         if after.guild.id == lowest.id:
             if before.status != after.status:
-                self.pending_updates['statuses'].append((aid, after.status.name, utcnow))
+                self.bot.pending_updates['statuses'].append((aid, after.status.name, utcnow))
             if before.activity != after.activity and not after.bot:
-                self.pending_updates['games'].append((aid, after.activity.name if after.activity else None, utcnow))
+                self.bot.pending_updates['games'].append((aid, after.activity.name if after.activity else None, utcnow))
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
@@ -444,4 +440,13 @@ class Pop(commands.Cog):
 
 
 def setup(bot):
+    if not hasattr(bot, 'pending_updates'):
+        bot.pending_updates = {recordtype : [] for recordtype in scheme.keys()}
+    if not hasattr(bot, 'pending_removes'):
+        bot.pending_removes = []
+    if not hasattr(bot, 'avy_urls'):
+        bot.avy_urls = dict()
+    if not hasattr(bot, 'avy_posting_queue'):
+        bot.avy_posting_queue = asyncio.Queue(maxsize = 50)
+
     bot.add_cog(Pop(bot))
