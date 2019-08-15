@@ -78,8 +78,11 @@ class Pop(commands.Cog):
         self.batch_remove_task = self.bot.loop.create_task(self.batch_member_remove())
         self.synced = asyncio.Event()
         self.wh = None
-        self.first_synced = False
+        
+        self.bot.loop.create_task(self.first_sync())
+
         self.logger = logging.getLogger('koishi')
+
 
     def cog_unload(self):
         self.logger.info('die')
@@ -289,17 +292,18 @@ class Pop(commands.Cog):
         except asyncio.CancelledError:
             self.logger.warning('Batching task for avatar posting was cancelled')
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        if self.first_synced == False:
-            utcnow = datetime.datetime.utcnow()
+    async def first_sync(self):
+        if self.bot.first_synced:
+            return # Already successfully synced the bot after initial boot
+        await self.bot.wait_until_ready()
+        utcnow = datetime.datetime.utcnow()
 
-            await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
-            await self.cog_log(True, utcnow - datetime.timedelta(microseconds=1))
-            self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
-            self.synced.set()
-            self.first_synced = True
-            self.logger.info("synced!")
+        await self.bot.request_offline_members(*[guild for guild in self.bot.guilds if guild.large])
+        await self.cog_log(True, utcnow - datetime.timedelta(microseconds=1))
+        self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
+        self.synced.set()
+        self.bot.first_synced = True
+        self.logger.info("synced!")
 
     def add_bulk_members(self, members, utcnow):
         for m in members:
@@ -448,5 +452,7 @@ def setup(bot):
         bot.avy_urls = dict()
     if not hasattr(bot, 'avy_posting_queue'):
         bot.avy_posting_queue = asyncio.Queue(maxsize = 50)
+    if not hasattr(bot, 'first_synced'):
+        bot.first_synced = False
 
     bot.add_cog(Pop(bot))
