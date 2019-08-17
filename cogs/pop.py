@@ -168,12 +168,18 @@ class Pop(commands.Cog):
         self.logger.info('started avatar downloading task')
 
         async def url_to_bytes(hash, url):
+            if isinstance(url, str):
+                retries = 5
+            elif isinstance(url, tuple):
+                retries = url[1] - 1
+                url = url[0]
+
             try:
                 async with self.bot.session.get(str(url)) as r:
                     if r.status == 200:
                         await self.bot.avy_posting_queue.put((hash, BytesIO(await r.read())))
                         return
-                    if r.status in [403, 404]:
+                    if r.status in {403, 404}:
                         # Discord has forsaken us. Mostly likely invalid url.
                         pass
                     elif r.status == 415:
@@ -184,11 +190,13 @@ class Pop(commands.Cog):
                             # give up resizing it. Its too small to be worthwhile.
                             new_url = url.with_query(size=str(new_size))
                         else:
+                            # could not find a gif size that did not throw 415, changing format to png.
                             new_url = url.with_path(url.path.replace('gif','png')).with_query(size=1024)
                         self.bot.avy_urls[hash] = new_url
                     else:
-                        # unsuccessful, put it back in for next round.
-                        self.bot.avy_urls[hash] = url
+                        # unsuccessful. Probably hit with a 5xx connection error. Put it back in for next round if there are retries left.
+                        if retries:
+                            self.bot.avy_urls[hash] = (url, retries)
                     self.logger.info(f'downloading {url} failed with {r.status}')
             except (asyncio.TimeoutError, aiohttp.ClientError):
                 self.logger.exception(f'downloading {url} failed.')
