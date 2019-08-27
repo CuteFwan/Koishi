@@ -73,7 +73,6 @@ class Stats(commands.Cog):
     @commands.command()
     async def toggle_purge(self, ctx):
         '''Toggles whether or not to purge or save presence updates beyond 30 days.'''
-        return await ctx.send("Not implemented yet.")
         
         result = await ctx.bot.pool.fetchval('''
             SELECT keep
