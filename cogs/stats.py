@@ -78,22 +78,22 @@ class Stats(commands.Cog):
             SELECT keep
             FROM presence_whitelist
             WHERE uid=$1''', ctx.author.id)
-        await ctx.send(f"Currently I am {'not' if not result else ''} storing your presence updates beyond 30 days. Would you like to change that? (y/n)")
+        await ctx.send(f"Currently I am {'not ' if not result else ''}storing your presence updates beyond 30 days. Would you like to change that? (y/n)")
 
         def check(m):
             return m.channel.id == ctx.channel.id and m.author.id == ctx.author.id and m.content.lower() in ["y", "yes", "n", "no"]
 
         answer = await ctx.bot.wait_for("message", check=check)
         if answer.content.lower() in ["y", "yes"]:
-            await ctx.pool.execute('''
+            await ctx.bot.pool.execute('''
                 INSERT INTO presence_whitelist
                 (uid, keep)
                 VALUES
                 ($1, $2)
-                ON CONFLICT uid
+                ON CONFLICT (uid)
                 DO UPDATE
                 SET keep = $2''', ctx.author.id, not result)
-            await ctx.send(f"Changed. Now {'not' if result else ''} storing your presence updates beyond 30 days.")
+            await ctx.send(f"Changed. Now {'not ' if result else ''}storing your presence updates beyond 30 days.")
         else:
             await ctx.send("Ok.")
 
