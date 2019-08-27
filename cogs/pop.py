@@ -331,8 +331,8 @@ class Pop(commands.Cog):
     def add_bulk_members(self, members, utcnow):
         for m in members:
             self.bot.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
-        self.logger.info(f'Added members in bulk: {len(list(set(members)))}')
-        for m in list(set(members)):
+        self.logger.info(f'Added members in bulk: {len(set(members))}')
+        for m in set(members):
             self.bot.pending_updates['names'].append((m.id, m.name, utcnow))
             self.bot.pending_updates['avatars'].append((
                                                     m.id,
