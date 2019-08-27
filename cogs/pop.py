@@ -212,10 +212,13 @@ class Pop(commands.Cog):
                     where
                         hash = any($1::text[])
                 '''
-                results = await self.bot.pool.fetch(query, self.bot.avy_urls.keys())
-                for r in results:
-                    # remove items in the avatar url dict that are already in the db
-                    self.bot.avy_urls.pop(r['hash'], None)
+                to_check = list(self.bot.avy_urls.keys())
+                batch_size = 50000
+                for i in range(0, len(to_check), batch_size):
+                    results = await self.bot.pool.fetch(query, to_check[i:i+batch_size])
+                    for r in results:
+                        # remove items in the avatar url dict that are already in the db
+                        self.bot.avy_urls.pop(r['hash'], None)
 
                 chunk = dict()
                 while len(self.bot.avy_urls) > 0 and len(chunk) < (50 - self.bot.avy_posting_queue.qsize()):
