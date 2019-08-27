@@ -94,7 +94,7 @@ class Stats(commands.Cog):
                 ON CONFLICT uid
                 DO UPDATE
                 SET keep = NOT keep''')
-            await ctx.send("Changed.")
+            await ctx.send(f"Changed. Now {'not' if result else ''} storing your presence updates beyond 30 days.")
         else:
             await ctx.send("Ok.")
 
