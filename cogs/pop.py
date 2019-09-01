@@ -168,10 +168,11 @@ class Pop(commands.Cog):
         self.logger.info('started avatar downloading task')
 
         async def url_to_bytes(hash, url):
-            retries = 5
             if isinstance(url, tuple):
                 retries = url[1] - 1
                 url = url[0]
+            else:
+                retries = 5
 
             try:
                 async with self.bot.session.get(str(url)) as r:
