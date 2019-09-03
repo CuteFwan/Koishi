@@ -4,11 +4,11 @@ import datetime
 from .utils import pretty
 import logging
 
+logger = logging.getLogger(__name__)
 
 class Basic(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.logger = logging.getLogger('koishi')
     
     @commands.command()
     async def ping(self, ctx):
@@ -17,7 +17,7 @@ class Basic(commands.Cog):
         end = time.perf_counter()
         rtt = (end - start)*1000
         waaa = resp.created_at - ctx.message.created_at
-        self.logger.info(f'{waaa} {waaa.total_seconds()} {waaa.microseconds}')
+        logger.debug(f'{waaa} {waaa.total_seconds()} {waaa.microseconds}')
         ts = waaa.total_seconds() * 1000
         id = (resp.id - ctx.message.id) >> 22
         ws = self.bot.latency * 1000

@@ -22,25 +22,25 @@ AVY_GUILD = config["AVY_GUILD"]
 AVY_CHANNEL = config["AVY_CHANNEL"]
 DEFAULT_PREFIX = config["DEFAULT_PREFIX"]
 
-logFormatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+logging.basicConfig(level=logging.INFO)
 
-discordLogger = logging.getLogger('discord')
-discordLogger.setLevel(logging.INFO)
+log_formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 
-discordFilehandler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-discordFilehandler.setFormatter(logFormatter)
-discordLogger.addHandler(discordFilehandler)
+discord_logger = logging.getLogger('discord')
+
+discord_file_handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+discord_file_handler.setFormatter(log_formatter)
+discord_logger.addHandler(discord_file_handler)
 
 logger = logging.getLogger('koishi')
-logger.setLevel(logging.INFO)
 
-consoleLogHandler = logging.StreamHandler(sys.stdout)
-consoleLogHandler.setFormatter(logFormatter)
-logger.addHandler(consoleLogHandler)
+console_log_handler = logging.StreamHandler(sys.stdout)
+console_log_handler.setFormatter(log_formatter)
+logger.addHandler(console_log_handler)
 
-koishiFilehandler = logging.FileHandler(filename='koishi.log', encoding='utf-8', mode='w')
-koishiFilehandler.setFormatter(logFormatter)
-logger.addHandler(koishiFilehandler)
+koishi_file_handler = logging.FileHandler(filename='koishi.log', encoding='utf-8', mode='w')
+koishi_file_handler.setFormatter(log_formatter)
+logger.addHandler(koishi_file_handler)
 
 description = '''Lies and slander follow'''
 bot = commands.AutoShardedBot(command_prefix=commands.when_mentioned_or(DEFAULT_PREFIX), description=description)
