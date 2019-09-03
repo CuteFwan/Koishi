@@ -313,6 +313,8 @@ class Pop(commands.Cog):
                         self.logger.exception('for some reason the file is closed')
                     except TypeError:
                         self.logger.exception('for some reason discord api returned something empty')
+                    except asyncio.TimeoutError:
+                        self.logger.exception('Webhook timed out')
                     await asyncio.sleep(2 + 2 * tries)
 
         except asyncio.CancelledError:
