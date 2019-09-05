@@ -513,6 +513,103 @@ class Stats(commands.Cog):
         buffer.seek(0)
         return buffer
 
+    @commands.command(aliases = ['hourlystatuspie'])
+    async def calendarstatuspie(self, ctx, target : typing.Optional[discord.Member] = None , tz : int = 0):
+        '''shows hourly presence data. Spirals inward magically.'''
+        if tz > 12 or tz < -12:
+            tz = 0
+        tz_delta = datetime.timedelta(hours=tz)
+        target = target or ctx.author
+        query = query_base + '''
+            select
+                s.hours as timestamp,
+                extract(day from s.hours) as day,
+                extract(hour from s.hours) as hour,
+                s.status,
+                sum(
+                    extract(EPOCH from 
+                        case 
+                            when date_trunc('hour', s.last_seen) = s.hours and
+                                 date_trunc('hour', s.first_seen) = s.hours then
+                                 s.last_seen - s.first_seen
+                            when date_trunc('hour', s.first_seen) = s.hours then 
+                                 (s.hours + interval '1 hour') - s.first_seen
+                            when date_trunc('hour', s.last_seen) = s.hours then
+                                 s.last_seen - s.hours
+                            else
+                                interval '1 hour'
+                        end
+                    )/3600
+                )as percent
+            from (
+                select
+                    status,
+                    first_seen + $2 as first_seen,
+                    last_seen + $2 as last_seen,
+                    generate_series(
+                        date_trunc('hour', first_seen + $2),
+                        date_trunc('hour', case when last_seen is null then now() at time zone 'utc' else last_seen end + $2),
+                        '1 hours'
+                    ) as hours
+                from status_data
+                where
+                    status in ('offline', 'idle', 'online', 'dnd')
+            ) as s
+            group by timestamp, status
+            order by timestamp, hour asc
+            '''
+        async with ctx.channel.typing():
+            data = await ctx.bot.pool.fetch(query, target.id, tz_delta)
+            parsed = self._parse_to_dict(data)
+            output = await self.bot.loop.run_in_executor(None, self._calendarstatuspie, parsed, tz)
+            await ctx.send(file=discord.File(output, filename='test.png'))
+
+    def _parse_to_dict(self, data):
+        output = {d : {h : (0,0,0,0) for h in range(24)} for d in range(31)}
+        status_percent = {}
+        prev_timestamp = data[0]['timestamp']
+        prev_day = data[0]['day']
+        y = 0
+        for d in data:
+            if d['day'] != prev_day:
+                y += (d['timestamp'].date() - prev_timestamp.date()).days
+                prev_day = d['day']
+            if prev_timestamp != d['timestamp']:
+                x = d['hour']
+                output[y][x] = self._calculate_color(status_percent, status)
+                prev_timestamp = d['timestamp']
+                status_percent = {}
+            status_percent[d['status']] = d['percent']
+        return output
+
+    def _calendarstatuspie(self, data, tz):
+        size = 1000
+        halfsize = size//2
+        offset = 30
+
+        base = Image.new(mode='RGBA', size=(size, size), color=(0, 0, 0, 0))
+        draw = ImageDraw.Draw(base)
+        i = 0
+        for day in range(30, -1, -1):
+            for hour in range((24*3)-1, -1, -1):
+                hour1 = hour / 3
+                hour2 = hour // 3
+                radius = int(((halfsize*(((day+offset)*24) + hour1)/((30+offset)*24))))
+                xy0 = halfsize - radius
+                xy1 = halfsize + radius
+
+                angle = (hour1/24)*360
+                angle2 = angle+(15/3)
+                draw.pieslice((xy0,xy0,xy1,xy1), angle, angle2, fill=data[day][hour2])
+                
+
+
+        buffer = BytesIO()
+        base.save(buffer, 'png')
+        buffer.seek(0)
+        return buffer
+
+
     @commands.command()
     async def hourlyupdates(self, ctx, target : typing.Optional[discord.Member] = None , tz : int = 0):
         if tz > 12 or tz < -12:
