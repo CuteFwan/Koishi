@@ -8,12 +8,12 @@ import textwrap
 from contextlib import redirect_stdout
 from .utils import pretty
 
+logger = logging.getLogger(__name__)
 
 class Admin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self._last_result = None
-        self.logger = logging.getLogger('koishi')
 
     async def cog_check(self, ctx):
         return ctx.author.id in self.bot.admins

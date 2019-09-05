@@ -9,6 +9,8 @@ from math import cos, sin, radians, ceil
 from PIL import Image, ImageOps, ImageDraw, ImageFilter, ImageEnhance, ImageFont
 import logging
 
+logger = logging.getLogger(__name__)
+
 status = {'online':(67, 181, 129),
           'idle':(250, 166, 26),
           'dnd':(240, 71, 71),
@@ -68,7 +70,6 @@ with status_data as(
 class Stats(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.logger = logging.getLogger("koishi")
         
     @commands.command()
     async def toggle_purge(self, ctx):
@@ -221,11 +222,11 @@ class Stats(commands.Cog):
         by = {'online':60, 'idle':110, 'dnd':160, 'offline':210}
         base.paste(piebase, None, piebase)
         draw = ImageDraw.Draw(base)
-        self.logger.debug(f'total statuses: {total}')
+        logger.debug(f'total statuses: {total}')
         for k, v in statuses.items():
             draw.rectangle(((bx, by[k]),(bx+30, by[k]+30)), fill=status[k], outline=(255,255,255,255))
             draw.text((bx+40, by[k]+8), f'{(v/total)*100:.2f}%', fill=discord_neutral, font=font)
-            self.logger.debug(f'{(v/total)*100:.2f}%')
+            logger.debug(f'{(v/total)*100:.2f}%')
         del draw
         buffer = BytesIO()
         base.save(buffer, 'png')

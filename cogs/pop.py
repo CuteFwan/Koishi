@@ -9,6 +9,8 @@ from io import BytesIO
 import logging
 from yarl import URL
 
+logger = logging.getLogger(__name__)
+
 scheme = {
          'names' : {
             'uid' : 'BIGINT',
@@ -82,17 +84,14 @@ class Pop(commands.Cog):
         
         self.bot.loop.create_task(self.first_sync())
 
-        self.logger = logging.getLogger('koishi')
-
-
     def cog_unload(self):
-        self.logger.info('die')
+        logger.info('die')
         utcnow = datetime.datetime.utcnow()
         self.post_avy_task.cancel()
         self.dl_avys_task.cancel()
         self.batch_remove_task.cancel()
         for recordtype, task in self.bg_tasks.items():
-            self.logger.info(f'canceling {recordtype}')
+            logger.info(f'canceling {recordtype}')
             task.cancel()
         self.bot.loop.create_task(self.cog_log(False, utcnow))
 
@@ -102,7 +101,7 @@ class Pop(commands.Cog):
         await self.bot.pool.execute(query, event, time)
 
     async def batching_task(self, recordtype, interval : int = 5):
-        self.logger.info(f'started {recordtype} task')
+        logger.info(f'started {recordtype} task')
         try:
             interval = min(max(1,interval),60)
             await self.bot.wait_until_ready()
@@ -110,11 +109,11 @@ class Pop(commands.Cog):
                 await asyncio.sleep(interval)
                 await self.insert_to_db(recordtype)
         except asyncio.CancelledError:
-            self.logger.warning(f'Batching task for {recordtype} was cancelled')
+            logger.warning(f'Batching task for {recordtype} was cancelled')
             await self.insert_to_db(recordtype)
             if self.bot.pending_updates[recordtype]:
-                self.logger.error(f'{len(self.bot.pending_updates[recordtype])} status updates DIED')
-        self.logger.info(f'exited {recordtype} task')
+                logger.error(f'{len(self.bot.pending_updates[recordtype])} status updates DIED')
+        logger.info(f'exited {recordtype} task')
 
     async def insert_to_db(self, recordtype):
         to_insert = self.bot.pending_updates[recordtype][:]
@@ -165,7 +164,7 @@ class Pop(commands.Cog):
         await self.bot.pool.execute(query, transformed)
 
     async def dl_avys(self):
-        self.logger.info('started avatar downloading task')
+        logger.info('started avatar downloading task')
 
         async def url_to_bytes(hash, url):
             if isinstance(url, tuple):
@@ -197,9 +196,9 @@ class Pop(commands.Cog):
                         # unsuccessful. Probably hit with a 5xx connection error. Put it back in for next round if there are retries left.
                         if retries:
                             self.bot.avy_urls[hash] = (url, retries)
-                    self.logger.info(f'downloading {url} failed with {r.status}')
+                    logger.info(f'downloading {url} failed with {r.status}')
             except (asyncio.TimeoutError, aiohttp.ClientError):
-                self.logger.exception(f'downloading {url} failed.')
+                logger.exception(f'downloading {url} failed.')
                 self.bot.avy_urls[hash] = url
         try:
             await self.bot.wait_until_ready()
@@ -229,10 +228,10 @@ class Pop(commands.Cog):
                     await asyncio.gather(*[url_to_bytes(avy, url) for avy, url in chunk.items()])
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
-            self.logger.warning('avatar downloading task canceled')
+            logger.warning('avatar downloading task canceled')
 
     async def batch_post_avatars(self):
-        self.logger.info('started avatar posting task')
+        logger.info('started avatar posting task')
         try:
             await self.bot.wait_until_ready()
             while True:
@@ -242,7 +241,7 @@ class Pop(commands.Cog):
                         channel_id=self.bot.avy_channel
                     )
                     if self.wh:
-                        self.logger.info(f'found webhook {self.wh.name} for {self.bot.avy_channel}')
+                        logger.info(f'found webhook {self.wh.name} for {self.bot.avy_channel}')
                         break
                     else:
                         await asyncio.sleep(2)
@@ -304,21 +303,21 @@ class Pop(commands.Cog):
                         await self.bot.pool.execute(query, transformed)
                         if len(backup) == 0:
                             break
-                        self.logger.warning(f'{len(backup)} failed to upload. retrying')
+                        logger.warning(f'{len(backup)} failed to upload. retrying')
                     except discord.HTTPException:
-                        self.logger.exception('something happened')
+                        logger.exception('something happened')
                     except aiohttp.ClientError:
-                        self.logger.exception('discord big gay')
+                        logger.exception('discord big gay')
                     except ValueError:
-                        self.logger.exception('for some reason the file is closed')
+                        logger.exception('for some reason the file is closed')
                     except TypeError:
-                        self.logger.exception('for some reason discord api returned something empty')
+                        logger.exception('for some reason discord api returned something empty')
                     except asyncio.TimeoutError:
-                        self.logger.exception('Webhook timed out')
+                        logger.exception('Webhook timed out')
                     await asyncio.sleep(2 + 2 * tries)
 
         except asyncio.CancelledError:
-            self.logger.warning('Batching task for avatar posting was cancelled')
+            logger.warning('Batching task for avatar posting was cancelled')
 
     async def first_sync(self):
         if self.bot.first_synced:
@@ -331,12 +330,12 @@ class Pop(commands.Cog):
         self.add_bulk_members(list(self.bot.get_all_members()), utcnow)
         self.synced.set()
         self.bot.first_synced = True
-        self.logger.info("synced!")
+        logger.info("synced!")
 
     def add_bulk_members(self, members, utcnow):
         for m in members:
             self.bot.pending_updates['nicks'].append((m.id, m.guild.id, m.nick, utcnow))
-        self.logger.info(f'Added members in bulk: {len(set(members))}')
+        logger.info(f'Added members in bulk: {len(set(members))}')
         for m in set(members):
             self.bot.pending_updates['names'].append((m.id, m.name, utcnow))
             self.bot.pending_updates['avatars'].append((
@@ -365,22 +364,22 @@ class Pop(commands.Cog):
             self.bot.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
     def fill_updates(self, uid, sid, msg, utcnow, full = True):
-        self.logger.info(f'running fill_updates with {full}')
+        logger.debug(f'running fill_updates with {full}')
         self.bot.pending_updates['nicks'].append((uid, sid, msg, utcnow))
         if full:
             self.bot.pending_removes.append((uid, utcnow))
 
     async def batch_member_remove(self):
-        self.logger.info('started batch member remove task')
+        logger.info('started batch member remove task')
         try:
             await self.bot.wait_until_ready()
             while True:
                 await asyncio.sleep(5)
                 await self.insert_member_removes()
         except asyncio.CancelledError:
-            self.logger.warning('task for batch member remove was cancelled')
+            logger.warning('task for batch member remove was cancelled')
             await self.insert_member_removes()
-        self.logger.info('exited batch member remove task')
+        logger.info('exited batch member remove task')
 
     async def insert_member_removes(self):
         to_insert = self.bot.pending_removes[:]
@@ -454,7 +453,7 @@ class Pop(commands.Cog):
         await self.synced.wait()
         utcnow = datetime.datetime.utcnow()
         self.add_bulk_members(guild.members, utcnow)
-        self.logger.info(f'Added {guild.member_count} people to queues!')
+        logger.info(f'Added {guild.member_count} people to queues!')
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
