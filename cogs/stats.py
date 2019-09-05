@@ -598,7 +598,7 @@ class Stats(commands.Cog):
                 xy0 = halfsize - radius
                 xy1 = halfsize + radius
 
-                angle = (hour1/24)*360
+                angle = (hour1/24)*360 - 90
                 angle2 = angle+(15/3)
                 draw.pieslice((xy0,xy0,xy1,xy1), angle, angle2, fill=data[day][hour2])
                 
