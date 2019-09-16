@@ -1,0 +1,4 @@
+asyncpg
+discord.py
+Pillow>=4.2.0
+psutil
