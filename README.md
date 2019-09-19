@@ -6,7 +6,7 @@ A personal discord bot
 
 I would prefer if you didn't run an instance of my bot. The source is provided for reference.
 
-Invite my bot if you want it on your server.
+Invite my bot if you want it on your server: https://discordapp.com/oauth2/authorize?client_id=261741896550842378&scope=bot
 
 ## Requirements
 
