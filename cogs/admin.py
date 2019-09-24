@@ -19,20 +19,20 @@ class Admin(commands.Cog):
         return ctx.author.id in self.bot.admins
 
     @commands.command(hidden=True)
-    async def load(ctx, extension_name: str):
-        bot.load_extension(extension_name)
+    async def load(self, ctx, extension_name: str):
+        ctx.bot.load_extension(extension_name)
         logger.info(f'{extension_name} loaded.')
         await ctx.send(f'{extension_name} loaded.')
 
     @commands.command(hidden=True)
-    async def unload(ctx, extension_name: str):
-        bot.unload_extension(extension_name)
+    async def unload(self, ctx, extension_name: str):
+        ctx.bot.unload_extension(extension_name)
         logger.info(f'{extension_name} unloaded.')
         await ctx.send(f'{extension_name} unloaded.')
 
     @commands.command(hidden=True)
-    async def reload(ctx, extension_name: str):
-        bot.reload_extension(extension_name)
+    async def reload(self, ctx, extension_name: str):
+        ctx.bot.reload_extension(extension_name)
         logger.info(f'{extension_name} reloaded.')
         await ctx.send(f'{extension_name} reloaded.')
 
