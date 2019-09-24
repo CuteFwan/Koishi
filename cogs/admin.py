@@ -19,6 +19,33 @@ class Admin(commands.Cog):
         return ctx.author.id in self.bot.admins
 
     @commands.command(hidden=True)
+    async def load(ctx, extension_name: str):
+        try:
+            bot.load_extension(extension_name)
+        except (AttributeError, ImportError) as e:
+            await ctx.send("```py\n{}: {}\n```".format(type(e).__name__, str(e)))
+            return
+        logger.info(f'{extension_name} loaded.')
+        await ctx.send(f'{extension_name} loaded.')
+
+    @commands.command(hidden=True)
+    async def unload(ctx, extension_name: str):
+        bot.unload_extension(extension_name)
+        logger.info(f'{extension_name} unloaded.')
+        await ctx.send(f'{extension_name} unloaded.')
+
+    @commands.command(hidden=True)
+    async def reload(ctx, extension_name: str):
+        bot.unload_extension(extension_name)
+        try:
+            bot.load_extension(extension_name)
+        except (AttributeError, ImportError) as e:
+            await ctx.send("```py\n{}: {}\n```".format(type(e).__name__, str(e)))
+            return
+        logger.info(f'{extension_name} reloaded.')
+        await ctx.send(f'{extension_name} reloaded.')
+
+    @commands.command(hidden=True)
     async def sql(self, ctx, *, query):
         """Copied from old bot"""
         start = time.perf_counter()
