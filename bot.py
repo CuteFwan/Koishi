@@ -61,18 +61,6 @@ async def on_ready():
     logger.info(f'Running {discord.__version__}')
 
 
-@bot.command(hidden=True)
-@commands.is_owner()
-async def backupreload(ctx, extension_name: str):
-    bot.unload_extension(extension_name)
-    try:
-        bot.load_extension(extension_name)
-    except (AttributeError, ImportError) as e:
-        await ctx.send("```py\n{}: {}\n```".format(type(e).__name__, str(e)))
-        return
-    logger.info(f'{extension_name} reloaded.')
-    await ctx.send("{} reloaded.".format(extension_name))
-
 
 @bot.command(hidden=True)
 @commands.is_owner()
