@@ -345,7 +345,7 @@ class Pop(commands.Cog):
                                                   ))
             self.bot.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
             self.bot.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
-            self.bot.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
+            #self.bot.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
             self.bot.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
 
@@ -360,7 +360,7 @@ class Pop(commands.Cog):
                                                   ))
             self.bot.pending_updates['discrims'].append((m.id, m.discriminator, utcnow))
             self.bot.pending_updates['statuses'].append((m.id, m.status.name, utcnow))
-            self.bot.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
+            #self.bot.pending_updates['games'].append((m.id, m.activity.name if m.activity else None, utcnow))
             self.bot.avy_urls[m.avatar if m.avatar else m.default_avatar.name] = str(m.avatar_url_as(static_format='png'))
 
     def fill_updates(self, uid, sid, msg, utcnow, full = True):
@@ -441,8 +441,8 @@ class Pop(commands.Cog):
         if after.guild.id == lowest.id:
             if before.status != after.status:
                 self.bot.pending_updates['statuses'].append((aid, after.status.name, utcnow))
-            if before.activity != after.activity and not after.bot:
-                self.bot.pending_updates['games'].append((aid, after.activity.name if after.activity else None, utcnow))
+            #if before.activity != after.activity and not after.bot:
+                #self.bot.pending_updates['games'].append((aid, after.activity.name if after.activity else None, utcnow))
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
