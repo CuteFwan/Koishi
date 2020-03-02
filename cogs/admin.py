@@ -46,9 +46,18 @@ class Admin(commands.Cog):
         if len(rows) > 0:
             data.append([r for r in rows[0].keys()])
             data.extend([[r for r in row.values()] for row in rows])
+
             table = await pretty.tabulate(data, max=100)
+            pagi = commands.Paginator(prefix='```',suffix='```',max_size=2000)
+            for line in table.split('\n'):
+                pagi.add_line(line)
+
             end = time.perf_counter()
-            await ctx.send(f'```\n{table}```\n*got {len(rows)} row{"s" if len(rows) > 1 else ""} in {(mid-start)*1000:.2f}ms\nbuilt table in {(end-mid)*1000:.2f}ms*')
+            pagi.add_line(f'*got {len(rows)} row{"s" if len(rows) > 1 else ""} in {(mid-start)*1000:.2f}ms\nbuilt table in {(end-mid)*1000:.2f}ms*')
+            if len(pagi.pages) >= 5:
+                return await ctx.send(f'Result too big! Cannot fit {len(rows)} results within 5 messages. Requires {len(table)} characters')
+            for page in pagi.pages:
+                await ctx.send(page)
         else:
             end = time.perf_counter()
             await ctx.send(f'*got 0 rows in {(mid-start)*1000:.2f}ms*')
