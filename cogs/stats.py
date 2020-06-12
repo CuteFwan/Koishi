@@ -691,7 +691,8 @@ class Stats(commands.Cog):
             async with self.bot.pool.acquire() as con:
                 await con.copy_from_query(query, ctx.author.id, output=buf, format='csv')
             buf.seek(0)
-            await ctx.send(file=discord.File(buf, filename=f'{ctx.author.id}_statuses.csv'))
+            await ctx.send('Sent data to your DMs.')
+            await ctx.author.send(file=discord.File(buf, filename=f'{ctx.author.id}_statuses.csv'))
 
 
 def setup(bot):
